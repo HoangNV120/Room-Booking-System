@@ -123,6 +123,8 @@ namespace PRN231ProjectAPI.Models
                     .WithMany(p => p.Rooms)
                     .HasForeignKey(d => d.HotelId)
                     .HasConstraintName("FK_Rooms_Hotels");
+                
+                entity.Property(e => e.ImageUrl).HasMaxLength(500);
             });
 
             modelBuilder.Entity<User>(entity =>

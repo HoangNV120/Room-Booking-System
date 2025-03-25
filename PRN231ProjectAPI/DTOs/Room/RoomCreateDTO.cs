@@ -6,4 +6,5 @@ public class RoomCreateDTO
     public string RoomType { get; set; } = null!;
     public decimal Price { get; set; }
     public string Status { get; set; } = "Available";
+    public IFormFile? Image { get; set; }
 }

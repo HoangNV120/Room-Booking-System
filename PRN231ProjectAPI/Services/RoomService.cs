@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+﻿using System.Text.Json;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using PRN231ProjectAPI.DTOs.Common;
 using PRN231ProjectAPI.DTOs.Room;
@@ -11,11 +12,13 @@ namespace PRN231ProjectAPI.Services
     {
         private readonly HotelBookingDBContext _context;
         private readonly IMapper _mapper;
+        private readonly ImageService _imageService;
 
-        public RoomService(HotelBookingDBContext context, IMapper mapper)
+        public RoomService(HotelBookingDBContext context, IMapper mapper, ImageService imageService)
         {
             _context = context;
             _mapper = mapper;
+            _imageService = imageService;
         }
 
         public IQueryable<RoomResponseDTO> GetRooms()
@@ -70,22 +73,31 @@ namespace PRN231ProjectAPI.Services
 
         public async Task<RoomResponseDTO> CreateRoom(RoomCreateDTO request)
         {
+            // Validate hotel exists
             var hotel = await _context.Hotels.FindAsync(request.HotelId);
             if (hotel == null)
                 throw new NotFoundException($"Hotel with ID {request.HotelId} not found");
 
+            // Create room entity with ID first
             var room = _mapper.Map<Room>(request);
             room.Id = Guid.NewGuid();
-            room.CreatedAt = DateTime.UtcNow;
+            room.CreatedAt = DateTime.Now;
+
+            // Upload image if provided
+            string imageUrl = string.Empty;
+            if (request.Image != null && request.Image.Length > 0)
+            {
+                // Use room_roomId naming convention
+                string imageName = $"room_{room.Id}";
+                imageUrl = await _imageService.UploadImageAsync(request.Image, null, imageName);
+            }
+
+            room.ImageUrl = imageUrl;
 
             _context.Rooms.Add(room);
             await _context.SaveChangesAsync();
 
-            var createdRoom = await _context.Rooms
-                .Include(r => r.Hotel)
-                .FirstOrDefaultAsync(r => r.Id == room.Id);
-
-            return _mapper.Map<RoomResponseDTO>(createdRoom);
+            return _mapper.Map<RoomResponseDTO>(room);
         }
 
         public async Task<RoomResponseDTO> UpdateRoom(Guid id, RoomUpdateDTO request)

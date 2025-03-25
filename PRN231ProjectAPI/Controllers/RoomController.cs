@@ -80,9 +80,10 @@ namespace PRN231ProjectAPI.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
+        [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<RoomResponseDTO>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> CreateRoom([FromBody] RoomCreateDTO request)
+        public async Task<IActionResult> CreateRoom([FromForm] RoomCreateDTO request)
         {
             try
             {

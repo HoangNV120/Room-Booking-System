@@ -17,6 +17,7 @@ namespace PRN231ProjectAPI.Models
         public decimal Price { get; set; }
         public string Status { get; set; } = null!;
         public DateTime? CreatedAt { get; set; }
+        public string? ImageUrl { get; set; }
 
         public virtual Hotel Hotel { get; set; } = null!;
         public virtual ICollection<Booking> Bookings { get; set; }

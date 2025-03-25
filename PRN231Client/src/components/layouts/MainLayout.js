@@ -54,6 +54,7 @@ export default function MainLayout({ children }) {
             ApiAuth.userInfo()
                 .then(response => {
                     setUser(response.data.data);
+                    localStorage.setItem('role' , response.data.data.role);
                     console.log("User info fetched successfully");
                 })
                 .catch(error => {

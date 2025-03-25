@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import {useState, useEffect, useRef} from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -12,6 +12,9 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { ArrowUpDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function HotelDetailPage() {
     const { id } = useParams();
@@ -20,6 +23,18 @@ export default function HotelDetailPage() {
     const [roomTypes, setRoomTypes] = useState([]);
     const [hotelLoading, setHotelLoading] = useState(true);
     const [roomsLoading, setRoomsLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Add Room Dialog state
+    const [isAddRoomDialogOpen, setIsAddRoomDialogOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [newRoom, setNewRoom] = useState({
+        roomType: '',
+        price: '',
+        status: 'Available',
+        image: null
+    });
+    const fileInputRef = useRef(null);
 
     // Filter and sort state
     const [filterType, setFilterType] = useState("all"); // Use "all" instead of empty string
@@ -40,6 +55,12 @@ export default function HotelDetailPage() {
     const hotelImage = "https://vanangroup.com.vn/wp-content/uploads/2024/10/29df21cd740c64fda44d8e567685970b-e1729733600172.jpg";
     const roomImage = "https://media.architecturaldigest.com/photos/659d9cb42446c7171718ecf0/master/w_1600%2Cc_limit/atr.royalmansion-bedroom2-mr.jpg";
 
+    // Check if user is admin
+    useEffect(() => {
+        const userRole = localStorage.getItem('role');
+        setIsAdmin(userRole === 'Admin');
+    }, []);
+    
     // Fetch hotel details
     useEffect(() => {
         const fetchHotel = async () => {
@@ -111,6 +132,88 @@ export default function HotelDetailPage() {
         }
     }, [id, pageNumber, pageSize, sortDescending, filterType, roomTypes.length]);
 
+
+    // Handle new room form input changes
+    const handleRoomInputChange = (e) => {
+        const { name, value } = e.target;
+        setNewRoom({
+            ...newRoom,
+            [name]: value
+        });
+    };
+
+    // Handle file input change
+    const handleFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            setNewRoom({
+                ...newRoom,
+                image: e.target.files[0]
+            });
+        }
+    };
+
+    // Handle form submission
+    const handleAddRoom = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+
+        try {
+            const roomData = {
+                hotelId: id,
+                roomType: newRoom.roomType,
+                price: parseFloat(newRoom.price),
+                status: newRoom.status,
+                image: newRoom.image
+            };
+
+            await ApiRoom.createRoom(roomData);
+            toast.success('Room created successfully');
+            setIsAddRoomDialogOpen(false);
+
+            // Reset form
+            setNewRoom({
+                roomType: '',
+                price: '',
+                status: 'Available',
+                image: null
+            });
+
+            // Refresh rooms
+            const fetchRoomsAfterAdd = async () => {
+                try {
+                    const params = {
+                        pageNumber: pageNumber,
+                        pageSize: pageSize,
+                        sortDescending: sortDescending
+                    };
+                    if (filterType !== "all") {
+                        params.roomType = filterType;
+                    }
+                    const response = await ApiRoom.getRoomsByHotelId(id, params);
+                    if (response.data && response.data.data) {
+                        setRooms(response.data.data.items);
+                        setPagination({
+                            pageNumber: response.data.data.pageNumber,
+                            pageSize: response.data.data.pageSize,
+                            totalCount: response.data.data.totalCount,
+                            totalPages: response.data.data.totalPages,
+                            hasPreviousPage: response.data.data.hasPreviousPage,
+                            hasNextPage: response.data.data.hasNextPage
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error refreshing rooms:', error);
+                }
+            };
+            fetchRoomsAfterAdd();
+        } catch (error) {
+            console.error('Error creating room:', error);
+            toast.error('Failed to create room');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
     const toggleSortOrder = () => {
         setSortDescending(!sortDescending);
     };
@@ -327,7 +430,7 @@ export default function HotelDetailPage() {
                                         <Card key={room.id} className="overflow-hidden transition-transform hover:scale-105">
                                             <div className="relative h-48">
                                                 <Image
-                                                    src={roomImage}
+                                                    src={room.imageUrl? room.imageUrl: roomImage}
                                                     alt={room.roomType}
                                                     fill
                                                     className="object-cover"
@@ -428,6 +531,104 @@ export default function HotelDetailPage() {
                             </div>
                         )}
                     </>
+                )}
+                {/* Add Room Dialog */}
+                <Dialog open={isAddRoomDialogOpen} onOpenChange={setIsAddRoomDialogOpen}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                            <DialogTitle>Add New Room</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAddRoom}>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="roomType" className="text-right">Room Type</Label>
+                                    <Input
+                                        id="roomType"
+                                        name="roomType"
+                                        value={newRoom.roomType}
+                                        onChange={handleRoomInputChange}
+                                        className="col-span-3"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="price" className="text-right">Price (VND)</Label>
+                                    <Input
+                                        id="price"
+                                        name="price"
+                                        type="number"
+                                        min="0"
+                                        step="1000"
+                                        value={newRoom.price}
+                                        onChange={handleRoomInputChange}
+                                        className="col-span-3"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="status" className="text-right">Status</Label>
+                                    <Select
+                                        value={newRoom.status}
+                                        onValueChange={(value) => setNewRoom({...newRoom, status: value})}
+                                    >
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Available">Available</SelectItem>
+                                            <SelectItem value="Occupied">Occupied</SelectItem>
+                                            <SelectItem value="Maintenance">Maintenance</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="image" className="text-right">Room Image</Label>
+                                    <div className="col-span-3">
+                                        <Input
+                                            id="image"
+                                            name="image"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                            ref={fileInputRef}
+                                            className="cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsAddRoomDialogOpen(false)}
+                                    disabled={isSubmitting}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? 'Adding...' : 'Add Room'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Add Room Button - Only show for admins */}
+                {isAdmin && (
+                    <div className="fixed bottom-6 right-6">
+                        <Button
+                            onClick={() => setIsAddRoomDialogOpen(true)}
+                            className="rounded-full h-14 w-14 shadow-lg"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                        </Button>
+                    </div>
                 )}
             </div>
         </MainLayout>

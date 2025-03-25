@@ -109,6 +109,7 @@ export default function Register() {
                     localStorage.setItem('accessToken', accessToken);
                     localStorage.setItem('refreshToken', refreshToken);
                     localStorage.setItem('userId', userId);
+                    
                 }
                 toast.success("Successfully registered with Google!");
                 router.push('/home');

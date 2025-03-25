@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.OData;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using Microsoft.OpenApi.Models;
+using PRN231ProjectAPI.Config;
 using PRN231ProjectAPI.DTOs.Payment;
 using PRN231ProjectAPI.Exceptions;
 using StackExchange.Redis;
@@ -33,14 +34,15 @@ builder.Services.AddScoped<PaymentService>();
 builder.Services.AddHttpContextAccessor(); 
 builder.Services.Configure<VnPayConfig>(builder.Configuration.GetSection("VnPayConfig"));
 builder.Services.AddHostedService<PaymentExpirationService>();
+builder.Services.Configure<CloudinaryConfig>(builder.Configuration.GetSection("Cloudinary"));
+builder.Services.AddScoped<ImageService>();
+
 
 // 🔹 Cấu hình Redis (nếu dùng Redis)
 builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.Configuration = builder.Configuration["Redis:Connection"];
 });
-builder.Services.AddSingleton<ConnectionMultiplexer>(sp => 
-    ConnectionMultiplexer.Connect(builder.Configuration["Redis:Connection"]));
 
 // 🔹 Cấu hình Authentication với JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");

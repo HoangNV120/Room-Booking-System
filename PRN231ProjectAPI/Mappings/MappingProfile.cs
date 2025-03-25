@@ -18,9 +18,9 @@ namespace PRN231ProjectAPI.Mappings
             CreateMap<User, SignUpResponseDTO>();
             
             CreateMap<Room, RoomResponseDTO>()
-                .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Hotel.Name));
-            CreateMap<Room, RoomResponseDTO>()
-                .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Hotel.Name));
+                .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Hotel.Name))
+                .ForMember(dest => dest.ImageUrl, opt => opt.MapFrom(src => src.ImageUrl));
+    
             CreateMap<RoomCreateDTO, Room>();
             CreateMap<RoomUpdateDTO, Room>();
 

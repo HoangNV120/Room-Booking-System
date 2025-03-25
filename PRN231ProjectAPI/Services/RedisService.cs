@@ -1,4 +1,4 @@
-﻿using StackExchange.Redis;
+﻿using Microsoft.Extensions.Caching.Distributed;
 using System;
 using System.Threading.Tasks;
 
@@ -6,12 +6,11 @@ namespace PRN231ProjectAPI.Services
 {
     public class RedisService
     {
-        private readonly IDatabase _database;
+        private readonly IDistributedCache _cache;
 
-        public RedisService(ConnectionMultiplexer redis)
+        public RedisService(IDistributedCache cache)
         {
-            _database = redis?.GetDatabase() ?? 
-                        throw new ArgumentNullException(nameof(redis), "Redis connection multiplexer cannot be null");
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache), "Distributed cache cannot be null");
         }
 
         public async Task BlacklistJtiAsync(string jti)
@@ -19,10 +18,13 @@ namespace PRN231ProjectAPI.Services
             if (string.IsNullOrEmpty(jti))
                 return;
 
-            await _database.StringSetAsync(
-                $"blacklist:{jti}", 
-                "true", 
-                TimeSpan.FromDays(7));
+            await _cache.SetStringAsync(
+                $"blacklist:{jti}",
+                "true",
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(1)
+                });
         }
 
         public async Task<bool> IsJtiBlacklisted(string jti)
@@ -30,7 +32,8 @@ namespace PRN231ProjectAPI.Services
             if (string.IsNullOrEmpty(jti))
                 return false;
 
-            return await _database.KeyExistsAsync($"blacklist:{jti}");
+            var value = await _cache.GetStringAsync($"blacklist:{jti}");
+            return value != null;
         }
     }
 }
