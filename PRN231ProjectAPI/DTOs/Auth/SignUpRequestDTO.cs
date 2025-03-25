@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using PRN231ProjectAPI.Attributes;
 
 namespace PRN231ProjectAPI.DTOs.Auth
 {
@@ -10,7 +11,7 @@ namespace PRN231ProjectAPI.DTOs.Auth
         [Required, EmailAddress]
         public string Email { get; set; }
 
-        [Required, MinLength(8)]
+        [Required, StrongPassword]
         public string Password { get; set; }
     }
 }

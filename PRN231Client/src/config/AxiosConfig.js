@@ -1,16 +1,16 @@
-// src/services/api.js
+// src/config/AxiosConfig.js
 import axios from "axios";
-import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-const api = axios.create({
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+console.log(API_URL);
+const http = axios.create({
     baseURL: API_URL,
     withCredentials: true
 });
 
 // Request interceptor
-api.interceptors.request.use((config) => {
+http.interceptors.request.use((config) => {
     // Get token from localStorage (client-side only)
     if (typeof window !== 'undefined') {
         const token = localStorage.getItem("accessToken");
@@ -37,22 +37,41 @@ const processQueue = (error, token = null) => {
     failedQueue = [];
 };
 
-api.interceptors.response.use(
+const handleLogout = () => {
+    // Clear auth data
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userId');
+
+    // Show toast notification
+    if (typeof window !== 'undefined') {
+        // Set a flag to show the message after redirect
+        sessionStorage.setItem('auth_error', 'Your session has expired. Please log in again.');
+
+        // Redirect to login
+        window.location.href = '/login';
+    }
+};
+
+http.interceptors.response.use(
     (response) => {
         return response;
     },
     async (error) => {
         const originalRequest = error.config;
 
-        // If error is 401 and we haven't tried to refresh the token yet
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Check if error is 401 and not "Invalid credentials" message
+        const isInvalidCredentials = error.response?.message === "Invalid credentials";
+
+        // Only attempt refresh i   f it's a 401 error, not for invalid credentials, and not already retrying
+        if (error.response?.status === 401 && !isInvalidCredentials && !originalRequest._retry) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
                 })
                     .then(token => {
                         originalRequest.headers['Authorization'] = 'Bearer ' + token;
-                        return api(originalRequest);
+                        return http(originalRequest);
                     })
                     .catch(err => {
                         return Promise.reject(err);
@@ -68,32 +87,25 @@ api.interceptors.response.use(
                     throw new Error('No refresh token available');
                 }
 
-                const request = {userId : localStorage.getItem('userId'), refreshToken : refreshToken};
-                const response = await api.post('/auth/refresh', { request });
+                const request = {userId: localStorage.getItem('userId'), refreshToken};
+                const response = await http.post('/api/auth/refresh', request);
 
                 if (response.data.data) {
-                    const { accessToken , refreshToken: newRefreshToken } = response.data.data;
+                    const { accessToken, refreshToken: newRefreshToken } = response.data.data;
                     localStorage.setItem('accessToken', accessToken);
                     localStorage.setItem('refreshToken', newRefreshToken);
 
-                    api.defaults.headers.common['Authorization'] = 'Bearer ' + accessToken;
+                    http.defaults.headers.common['Authorization'] = 'Bearer ' + accessToken;
                     originalRequest.headers['Authorization'] = 'Bearer ' + accessToken;
 
-                    processQueue(null, token);
-                    return api(originalRequest);
+                    processQueue(null, accessToken);
+                    return http(originalRequest);
                 } else {
                     throw new Error('Refresh token failed');
                 }
             } catch (err) {
                 processQueue(err, null);
-                // Clear auth data and redirect to login
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
-
-                // In client components this works, in server it won't
-                if (typeof window !== 'undefined') {
-                    window.location.href = '/login';
-                }
+                handleLogout();
                 return Promise.reject(err);
             } finally {
                 isRefreshing = false;
@@ -104,4 +116,4 @@ api.interceptors.response.use(
     }
 );
 
-export default api;
+export default http;

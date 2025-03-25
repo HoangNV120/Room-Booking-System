@@ -16,6 +16,8 @@ namespace PRN231ProjectAPI.Models
         public string PasswordHash { get; set; } = null!;
         public string Role { get; set; } = null!;
         public DateTime? CreatedAt { get; set; }
+        public string? GoogleId { get; set; }
+        public bool IsExternalLogin { get; set; }
 
         public virtual ICollection<Booking> Bookings { get; set; }
     }

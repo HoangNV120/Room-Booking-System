@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using PRN231ProjectAPI.DTOs.Common;
 using PRN231ProjectAPI.DTOs.Room;
 using PRN231ProjectAPI.Exceptions;
 using PRN231ProjectAPI.Models;
@@ -135,6 +136,58 @@ namespace PRN231ProjectAPI.Services
 
             _context.Rooms.Remove(room);
             await _context.SaveChangesAsync();
+        }
+        
+        public async Task<PagedResponseDTO<RoomResponseDTO>> GetRoomsByHotelId(Guid hotelId, RoomFilterRequestDTO request)
+        {
+            // Check if hotel exists
+            var hotelExists = await _context.Hotels.AnyAsync(h => h.Id == hotelId);
+            if (!hotelExists)
+                throw new NotFoundException($"Hotel with ID {hotelId} not found");
+        
+            // Start with rooms from the specified hotel
+            var query = _context.Rooms
+                .Include(r => r.Hotel)
+                .Where(r => r.HotelId == hotelId)
+                .AsQueryable();
+
+            // Apply room type filter if provided
+            if (!string.IsNullOrWhiteSpace(request.RoomType))
+            {
+                query = query.Where(r => r.RoomType == request.RoomType);
+            }
+
+            // Count total before pagination
+            var totalCount = await query.CountAsync();
+
+            // Apply ordering by price
+            if (request.SortDescending)
+            {
+                query = query.OrderByDescending(r => r.Price);
+            }
+            else
+            {
+                query = query.OrderBy(r => r.Price);
+            }
+
+            // Apply pagination
+            var rooms = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            // Map to DTOs
+            var roomDtos = _mapper.Map<List<RoomResponseDTO>>(rooms);
+
+            // Create paged response
+            return new PagedResponseDTO<RoomResponseDTO>
+            {
+                Items = roomDtos,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
+            };
         }
     }
 }

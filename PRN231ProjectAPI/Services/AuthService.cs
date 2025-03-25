@@ -6,6 +6,7 @@ using PRN231ProjectAPI.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Google.Apis.Auth;
 
 namespace PRN231ProjectAPI.Services
 {
@@ -39,7 +40,8 @@ namespace PRN231ProjectAPI.Services
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                ExpiresIn = 3600
+                ExpiresIn = 3600,
+                UserId = user.Id
             };
         }
 
@@ -143,7 +145,7 @@ namespace PRN231ProjectAPI.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-        public ClaimsPrincipal? ValidateToken(string token)
+        private ClaimsPrincipal? ValidateToken(string token)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]);
@@ -179,6 +181,81 @@ namespace PRN231ProjectAPI.Services
                 Console.WriteLine($"Token không hợp lệ: {ex.Message}");
                 return null;
             }
+        }
+        public async Task<ExternalLoginResponseDTO> LoginWithGoogle(GoogleLoginRequestDTO request)
+        {
+            try
+            {
+                // Validate Google token
+                var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, new GoogleJsonWebSignature.ValidationSettings());
+
+                // Check if user exists by email
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
+                var isNewUser = false;
+
+                // If user doesn't exist, create one
+                if (user == null)
+                {
+                    user = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = payload.Name,
+                        Email = payload.Email,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // Random password
+                        Role = "Customer",
+                        CreatedAt = DateTime.UtcNow,
+                        GoogleId = payload.Subject, // Store Google's unique user ID
+                        IsExternalLogin = true
+                    };
+
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
+                    isNewUser = true;
+                }
+                else if (string.IsNullOrEmpty(user.GoogleId))
+                {
+                    // If existing user doesn't have GoogleId, update it
+                    user.GoogleId = payload.Subject;
+                    user.IsExternalLogin = true;
+                    await _context.SaveChangesAsync();
+                }
+
+                // Generate tokens
+                var accessToken = GenerateAccessToken(user);
+                var refreshToken = GenerateRefreshToken(user);
+
+                return new ExternalLoginResponseDTO
+                {
+                    AccessToken = accessToken,
+                    RefreshToken = refreshToken,
+                    ExpiresIn = 3600,
+                    UserId = user.Id,
+                    IsNewUser = isNewUser
+                };
+            }
+            catch (Exception ex)
+            {
+                // Log exception
+                Console.WriteLine($"Google login error: {ex.Message}");
+                return null;
+            }
+        }
+        public async Task<UserInfoDTO> GetUserInfo(Guid userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+    
+            if (user == null)
+                return null;
+        
+            return new UserInfoDTO
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                Role = user.Role,
+                IsExternalLogin = user.IsExternalLogin,
+                CreatedAt = user.CreatedAt
+            };
         }
 
     }

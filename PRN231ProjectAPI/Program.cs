@@ -12,6 +12,7 @@ using Microsoft.OData.ModelBuilder;
 using Microsoft.OpenApi.Models;
 using PRN231ProjectAPI.DTOs.Payment;
 using PRN231ProjectAPI.Exceptions;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,14 +37,20 @@ builder.Services.AddHostedService<PaymentExpirationService>();
 // 🔹 Cấu hình Redis (nếu dùng Redis)
 builder.Services.AddStackExchangeRedisCache(options =>
 {
-    options.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
+    options.Configuration = builder.Configuration["Redis:Connection"];
 });
+builder.Services.AddSingleton<ConnectionMultiplexer>(sp => 
+    ConnectionMultiplexer.Connect(builder.Configuration["Redis:Connection"]));
 
 // 🔹 Cấu hình Authentication với JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = false;
@@ -58,6 +65,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(key)
         };
+    })
+    .AddGoogle(options =>
+    {
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"];
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+        options.CallbackPath = "/signin-google";
     });
 
 // 🔹 Cấu hình Authorization
@@ -117,6 +130,17 @@ builder.Services.AddSwaggerGen(c =>
     }
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ReactAppPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 // 🔹 Bật Swagger nếu đang ở môi trường phát triển
@@ -125,6 +149,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseCors("ReactAppPolicy");
 
 app.UseHttpsRedirection();
 
@@ -145,5 +170,6 @@ static IEdmModel GetEdmModel()
 {
     var builder = new ODataConventionModelBuilder();
     builder.EntitySet<Room>("Rooms");
+    builder.EntitySet<Hotel>("Hotels");
     return builder.GetEdmModel();
 }

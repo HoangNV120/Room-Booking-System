@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PRN231ProjectAPI.DTOs.Auth;
 using PRN231ProjectAPI.DTOs.Common;
@@ -73,6 +75,40 @@ namespace PRN231ProjectAPI.Controllers
 
             await _authService.Logout(request);
             return Ok(new ApiResponse<object>(200, "Logged out successfully"));
+        }
+        [HttpPost("google-login")]
+        [ProducesResponseType(typeof(ApiResponse<ExternalLoginResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+                throw new BadRequestException("Invalid request data");
+
+            var result = await _authService.LoginWithGoogle(request);
+            if (result == null)
+                throw new UnauthorizedException("Invalid Google token");
+
+            return Ok(new ApiResponse<ExternalLoginResponseDTO>(200, "Google login successful", result));
+        }
+        [HttpGet("user-info")]
+        [Authorize] 
+        [ProducesResponseType(typeof(ApiResponse<UserInfoDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetUserInfo()
+        {
+            // Get user ID from claims
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                throw new UnauthorizedException("Invalid authentication token");
+        
+            var userInfo = await _authService.GetUserInfo(userId);
+    
+            if (userInfo == null)
+                throw new NotFoundException("User not found");
+        
+            return Ok(new ApiResponse<UserInfoDTO>(200, "User information retrieved successfully", userInfo));
         }
     }
 }

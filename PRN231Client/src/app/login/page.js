@@ -1,65 +1,196 @@
 // src/app/login/page.js
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { ApiAuth } from '@/services/ApiAuth';
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { ArrowLeft } from 'lucide-react';
 
 export default function Login() {
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [checkingAuth, setCheckingAuth] = useState(true);
+
+    // Check for auth error message on component mount
+    useEffect(() => {
+        const hasToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+
+        if (hasToken) {
+            toast.info("You are already logged in");
+
+            // Try to get the referrer (the page that sent the user to login)
+            const referrer = document.referrer;
+            const isInternalReferrer = referrer && referrer.includes(window.location.host);
+            const referrerPath = isInternalReferrer ? new URL(referrer).pathname : null;
+
+            // Check if referrer is valid and not login/register
+            if (referrerPath && !referrerPath.includes('/login') && !referrerPath.includes('/register')) {
+                router.push(referrerPath);
+            } else {
+                // Try the stored previousPath as fallback
+                const previousPath = sessionStorage.getItem('previousPath');
+                if (previousPath && !previousPath.includes('/login') && !previousPath.includes('/register')) {
+                    router.push(previousPath);
+                } else {
+                    // Default fallback
+                    router.push('/home');
+                }
+            }
+        } else {
+            setCheckingAuth(false);
+        }
+    }, [router]);
+
+    useEffect(() => {
+        // Check if a remembered email exists and pre-fill it
+        const rememberedEmail = localStorage.getItem('rememberedEmail');
+        if (rememberedEmail) {
+            setEmail(rememberedEmail);
+            setRememberMe(true);
+        }
+    }, []);
+
+    const validatePassword = (password) => {
+        if (password.length < 8) {
+            return "Password must be at least 8 characters";
+        }
+        if (!/[A-Z]/.test(password)) {
+            return "Password must contain at least one uppercase letter";
+        }
+        if (!/[a-z]/.test(password)) {
+            return "Password must contain at least one lowercase letter";
+        }
+        if (!/[0-9]/.test(password)) {
+            return "Password must contain at least one number";
+        }
+        if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+            return "Password must contain at least one special character";
+        }
+        return "";
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
         setError('');
 
-        try {
-            const response = await fetch('api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Login failed');
-            }
-
-            // Store token in localStorage or cookies
-            localStorage.setItem('token', data.data.token);
-            localStorage.setItem('refreshToken', data.data.refreshToken);
-
-            router.push('/dashboard'); // Redirect to dashboard
-        } catch (err) {
-            setError(err.message);
-        } finally {
+        // Validate password
+        const passwordValidationError = validatePassword(password);
+        if (passwordValidationError) {
+            setPasswordError(passwordValidationError);
             setIsLoading(false);
+            return;
         }
+
+        const request = { email: email, password: password };
+
+        ApiAuth.signIn(request)
+            .then(response => {
+                handleLoginSuccess(response.data);
+            })
+            .catch(err => {
+                // Handle error from axios
+                setError(err.response?.data?.message || 'Login failed');
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
+    };
+
+    const handleGoogleLoginSuccess = (credentialResponse) => {
+        setIsLoading(true);
+        setError('');
+
+        // Send idToken instead of credential as required by backend
+        const request = {
+            idToken: credentialResponse.credential
+        };
+
+        ApiAuth.googleLogin(request)
+            .then(response => {
+                handleLoginSuccess(response.data);
+            })
+            .catch(err => {
+                setError(err.response?.data?.message || 'Google login failed');
+                console.error('Google login error:', err);
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
+    };
+
+    const handleLoginSuccess = (data) => {
+        // Store tokens in localStorage or sessionStorage based on rememberMe
+        if (rememberMe) {
+            localStorage.setItem('accessToken', data.data.accessToken);
+            localStorage.setItem('refreshToken', data.data.refreshToken);
+            localStorage.setItem('userId', data.data.userId);
+            localStorage.setItem('rememberMe', 'true');
+            // Store email for auto-fill next time
+            if (email) {
+                localStorage.setItem('rememberedEmail', email);
+            }
+        } else {
+            sessionStorage.setItem('accessToken', data.data.accessToken);
+            sessionStorage.setItem('refreshToken', data.data.refreshToken);
+            sessionStorage.setItem('userId', data.data.userId);
+            localStorage.removeItem('rememberMe');
+            localStorage.removeItem('rememberedEmail');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('userId');
+        }
+
+        toast.success("Successfully logged in!");
+        router.push('/home');
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-            <div className="w-full max-w-md">
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all hover:scale-105">
-                    <div className="px-8 py-6">
-                        <div className="text-center mb-8">
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+                <Link
+                    href="/home"
+                    className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mb-4 self-start ml-4 sm:ml-8"
+                >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    <span>Back to Home</span>
+                </Link>
+                {checkingAuth ? (
+                        <div className="flex flex-col items-center justify-center">
+                            <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="mt-4 text-gray-600 dark:text-gray-300">Checking authentication...</p>
+                        </div>
+                    ) : (
+                <Card className="w-full max-w-md">
+                    <CardHeader className="space-y-1 text-center">
+                        <div className="flex justify-center mb-2">
                             <Image
                                 src="/next.svg"
                                 alt="Logo"
                                 width={120}
                                 height={30}
-                                className="mx-auto mb-4 dark:invert"
+                                className="dark:invert"
                             />
-                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome back</h2>
-                            <p className="text-gray-500 dark:text-gray-400 mt-2">Sign in to your account</p>
                         </div>
-
+                        <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
+                        <CardDescription>Sign in to your account</CardDescription>
+                    </CardHeader>
+                    <CardContent>
                         {error && (
                             <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded">
                                 <p>{error}</p>
@@ -67,90 +198,117 @@ export default function Login() {
                         )}
 
                         <form onSubmit={handleSubmit}>
-                            <div className="mb-6">
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Email Address
-                                </label>
-                                <input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                    className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent dark:text-white transition-colors"
-                                    placeholder="name@company.com"
-                                />
-                            </div>
-                            <div className="mb-6">
-                                <div className="flex justify-between mb-1">
-                                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Password
-                                    </label>
-                                    <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
-                                        Forgot password?
-                                    </Link>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Email Address</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                        placeholder="name@company.com"
+                                    />
                                 </div>
-                                <input
-                                    id="password"
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent dark:text-white transition-colors"
-                                    placeholder="••••••••"
-                                />
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <Label htmlFor="password">Password</Label>
+                                        <Link
+                                            href="/forgot-password"
+                                            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                        >
+                                            Forgot password?
+                                        </Link>
+                                    </div>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value);
+                                            setPasswordError(validatePassword(e.target.value));
+                                        }}
+                                        required
+                                        className={passwordError ? "border-red-500" : ""}
+                                        placeholder="••••••••"
+                                    />
+                                    {passwordError && (
+                                        <p className="text-sm text-red-500">{passwordError}</p>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="rememberMe"
+                                        checked={rememberMe}
+                                        onCheckedChange={setRememberMe}
+                                    />
+                                    <Label
+                                        htmlFor="rememberMe"
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                        Remember me
+                                    </Label>
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading || passwordError}
+                                    className="w-full"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Signing in...
+                                        </>
+                                    ) : "Sign in"}
+                                </Button>
                             </div>
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none rounded-lg text-white font-medium text-center transition-all transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-blue-600 flex items-center justify-center"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Signing in...
-                                    </>
-                                ) : "Sign in"}
-                            </button>
                         </form>
 
-                        <div className="mt-6 flex items-center">
-                            <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-                            <span className="mx-4 text-sm text-gray-500 dark:text-gray-400">or</span>
-                            <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-                        </div>
-
-                        <div className="mt-6">
-                            <div className="space-y-3">
-                                <button className="w-full flex items-center justify-center py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
-                                    <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M22.56 12.25C22.56 11.47 22.49 10.72 22.36 10H12V14.26H17.92C17.66 15.63 16.88 16.79 15.72 17.55V20.34H19.28C21.36 18.42 22.56 15.6 22.56 12.25Z" fill="#4285F4"/>
-                                        <path d="M12 23C14.97 23 17.46 22.02 19.28 20.34L15.72 17.55C14.73 18.21 13.48 18.59 12 18.59C9.06 18.59 6.59 16.65 5.72 14.04H2.05V16.91C3.85 20.52 7.61 23 12 23Z" fill="#34A853"/>
-                                        <path d="M5.72 14.04C5.5 13.36 5.37 12.64 5.37 11.9C5.37 11.16 5.5 10.44 5.72 9.76V6.89H2.05C1.35 8.43 0.96 10.13 0.96 11.9C0.96 13.67 1.35 15.37 2.05 16.91L5.72 14.04Z" fill="#FBBC05"/>
-                                        <path d="M12 5.21C13.62 5.21 15.08 5.78 16.21 6.86L19.36 3.71C17.45 1.9 14.97 0.75 12 0.75C7.61 0.75 3.85 3.23 2.05 6.89L5.72 9.76C6.59 7.15 9.06 5.21 12 5.21Z" fill="#EA4335"/>
-                                    </svg>
-                                    Sign in with Google
-                                </button>
+                        <div className="mt-6 relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <Separator className="w-full" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">
+                                    Or continue with
+                                </span>
                             </div>
                         </div>
 
-                        <div className="mt-6 text-center">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Don't have an account?{' '}
-                                <Link
-                                    href="/register"
-                                    className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                                >
-                                    Sign up
-                                </Link>
-                            </p>
+                        <div className="mt-6 w-full">
+                            <GoogleLogin
+                                onSuccess={handleGoogleLoginSuccess}
+                                onError={() => {
+                                    console.error('Google login failed');
+                                    setError('Google login failed. Please try again.');
+                                }}
+                                theme="outline"
+                                size="large"
+                                width="100%"
+                                text="signin_with"
+                                shape="rectangular"
+                            />
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Don&apos;t have an account?{' '}
+                            <Link
+                                href="/register"
+                                className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                                Sign up
+                            </Link>
+                        </p>
+                    </CardFooter>
+                </Card> )}
             </div>
-        </div>
+        </GoogleOAuthProvider>
     );
 }

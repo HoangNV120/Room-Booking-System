@@ -19,13 +19,13 @@ namespace PRN231ProjectAPI.Controllers
         }
 
         [HttpGet]
-        [ProducesResponseType(typeof(ApiResponse<IEnumerable<HotelResponseDTO>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetHotels()
+        [ProducesResponseType(typeof(ApiResponse<PagedResponseDTO<HotelResponseDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetHotels([FromQuery] HotelSearchDTO searchParams)
         {
             try
             {
-                var hotelDtos = await _hotelService.GetHotels();
-                return Ok(new ApiResponse<IEnumerable<HotelResponseDTO>>(hotelDtos));
+                var pagedHotels = await _hotelService.GetHotels(searchParams);
+                return Ok(new ApiResponse<PagedResponseDTO<HotelResponseDTO>>(pagedHotels));
             }
             catch (Exception ex)
             {

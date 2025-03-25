@@ -143,6 +143,11 @@ namespace PRN231ProjectAPI.Models
                 entity.Property(e => e.PasswordHash).HasMaxLength(255);
 
                 entity.Property(e => e.Role).HasMaxLength(50);
+                
+                entity.Property(e => e.GoogleId);
+    
+                entity.Property(e => e.IsExternalLogin)
+                    .HasDefaultValue(false);
             });
 
             OnModelCreatingPartial(modelBuilder);

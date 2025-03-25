@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using PRN231ProjectAPI.DTOs.Auth;
 using PRN231ProjectAPI.DTOs.Booking;
+using PRN231ProjectAPI.DTOs.Hotel;
 using PRN231ProjectAPI.DTOs.Payment;
 using PRN231ProjectAPI.DTOs.Room;
 using PRN231ProjectAPI.Models;
@@ -14,6 +15,7 @@ namespace PRN231ProjectAPI.Mappings
         {
             CreateMap<SignUpRequestDTO, User>()
                 .ForMember(dest => dest.PasswordHash, opt => opt.Ignore());
+            CreateMap<User, SignUpResponseDTO>();
             
             CreateMap<Room, RoomResponseDTO>()
                 .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Hotel.Name));
@@ -21,6 +23,8 @@ namespace PRN231ProjectAPI.Mappings
                 .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Hotel.Name));
             CreateMap<RoomCreateDTO, Room>();
             CreateMap<RoomUpdateDTO, Room>();
+
+            CreateMap<Hotel, HotelResponseDTO>();
             
             
             // Add Booking mappings

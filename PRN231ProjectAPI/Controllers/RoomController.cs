@@ -145,5 +145,24 @@ namespace PRN231ProjectAPI.Controllers
                 throw new InternalServerException($"Error deleting room: {ex.Message}");
             }
         }
+        [HttpGet("hotel/{hotelId}")]
+        [ProducesResponseType(typeof(ApiResponse<PagedResponseDTO<RoomResponseDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetRoomsByHotelId(Guid hotelId, [FromQuery] RoomFilterRequestDTO request)
+        {
+            try
+            {
+                var pagedRooms = await _roomService.GetRoomsByHotelId(hotelId, request);
+                return Ok(new ApiResponse<PagedResponseDTO<RoomResponseDTO>>(pagedRooms));
+            }
+            catch (NotFoundException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new InternalServerException($"Error retrieving rooms for hotel: {ex.Message}");
+            }
+        }
     }
 }

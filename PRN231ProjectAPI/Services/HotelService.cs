@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using PRN231ProjectAPI.DTOs.Common;
 using PRN231ProjectAPI.DTOs.Hotel;
 using PRN231ProjectAPI.Exceptions;
 using PRN231ProjectAPI.Models;
@@ -17,10 +18,48 @@ namespace PRN231ProjectAPI.Services
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<HotelResponseDTO>> GetHotels()
+        public async Task<PagedResponseDTO<HotelResponseDTO>> GetHotels(HotelSearchDTO searchParams)
         {
-            var hotels = await _context.Hotels.ToListAsync();
-            return _mapper.Map<List<HotelResponseDTO>>(hotels);
+            var query = _context.Hotels.AsQueryable();
+
+            // Apply name search if provided
+            if (!string.IsNullOrWhiteSpace(searchParams.NameSearch))
+            {
+                var searchTerm = searchParams.NameSearch.ToLower();
+                query = query.Where(h => h.Name.ToLower().Contains(searchTerm));
+            }
+
+            // Count total before pagination
+            var totalCount = await query.CountAsync();
+
+            // Apply ordering by rating
+            if (searchParams.SortDescending)
+            {
+                query = query.OrderByDescending(h => h.Rating);
+            }
+            else
+            {
+                query = query.OrderBy(h => h.Rating);
+            }
+
+            // Apply pagination
+            var hotels = await query
+                .Skip((searchParams.PageNumber - 1) * searchParams.PageSize)
+                .Take(searchParams.PageSize)
+                .ToListAsync();
+
+            // Map to DTOs
+            var hotelDtos = _mapper.Map<List<HotelResponseDTO>>(hotels);
+
+            // Create paged response
+            return new PagedResponseDTO<HotelResponseDTO>
+            {
+                Items = hotelDtos,
+                PageNumber = searchParams.PageNumber,
+                PageSize = searchParams.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)searchParams.PageSize)
+            };
         }
 
         public async Task<HotelResponseDTO> GetHotelById(Guid id)
