@@ -102,9 +102,10 @@ namespace PRN231ProjectAPI.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
+        [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<RoomResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdateRoom(Guid id, [FromBody] RoomUpdateDTO request)
+        public async Task<IActionResult> UpdateRoom(Guid id, [FromForm] RoomUpdateDTO request)
         {
             try
             {

@@ -106,6 +106,8 @@ namespace PRN231ProjectAPI.Models
             modelBuilder.Entity<Room>(entity =>
             {
                 entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+                
+                entity.Property(e => e.RoomName).HasMaxLength(255);
 
                 entity.Property(e => e.CreatedAt)
                     .HasColumnType("datetime")

@@ -7,6 +7,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Google.Apis.Auth;
+using PRN231ProjectAPI.Exceptions;
+using PRN231ProjectAPI.Utils;
 
 namespace PRN231ProjectAPI.Services
 {
@@ -18,13 +20,15 @@ namespace PRN231ProjectAPI.Services
         private readonly RedisService _redisService;
         private readonly IMapper _mapper;
         private readonly IConfiguration _config;
+        private readonly EmailService _emailService;
 
-        public AuthService(HotelBookingDBContext context, RedisService redisService, IMapper mapper, IConfiguration config)
+        public AuthService(HotelBookingDBContext context, RedisService redisService, IMapper mapper, IConfiguration config, EmailService emailService)
         {
             _context = context;
             _redisService = redisService;
             _mapper = mapper;
             _config = config;
+            _emailService = emailService;
         }
 
         public async Task<LoginResponseDto?> Login(LoginRequestDTO request)
@@ -45,18 +49,48 @@ namespace PRN231ProjectAPI.Services
             };
         }
 
-        public async Task<SignUpResponseDTO?> SignUp(SignUpRequestDTO request)
+        public async Task<SignUpResponseDTO> SignUp(SignUpRequestDTO request)
         {
             if (await _context.Users.AnyAsync(u => u.Email == request.Email))
-                return null;
+                throw new ConflictException($"Email {request.Email} already exists");
 
-            var user = _mapper.Map<User>(request);
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+            var verificationCode = Guid.NewGuid().ToString();
+            await _redisService.CacheRegistrationDataAsync(request, verificationCode);
+
+            // Send verification email
+            var subject = "Email Verification";
+            var verificationLink = $"http://localhost:3000/verify/{verificationCode}?email={Uri.EscapeDataString(request.Email)}";
+            var message = $"Please click the link below to verify your email address:\n\n{verificationLink}";
+            await _emailService.SendEmailAsync(request.Email, subject, message);
+
+            return new SignUpResponseDTO { Email = request.Email };
+        }
+
+        public async Task<SignUpResponseDTO> VerifyRegistration(VerificationRequestDTO request)
+        {
+            // Retrieve stored verification code
+            var storedCode = await _redisService.GetVerificationCodeAsync(request.Email);
+    
+            // Check if code is valid
+            if (string.IsNullOrEmpty(storedCode) || storedCode != request.Code)
+                return null;
+    
+            // Get registration data
+            var userData = await _redisService.GetRegistrationDataAsync(request.Email);
+            if (userData == null)
+                return null;
+        
+            // Create the user in the database
+            var user = _mapper.Map<User>(userData);
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(userData.Password);
             user.Role = "Customer";
             user.CreatedAt = DateTime.UtcNow;
-
+    
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+    
+            // Remove registration data from Redis
+            await _redisService.RemoveRegistrationDataAsync(request.Email);
     
             return _mapper.Map<SignUpResponseDTO>(user);
         }
@@ -186,52 +220,68 @@ namespace PRN231ProjectAPI.Services
         {
             try
             {
-                // Validate Google token
-                var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, new GoogleJsonWebSignature.ValidationSettings());
+                  // Validate Google token
+                  var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, new GoogleJsonWebSignature.ValidationSettings());
 
-                // Check if user exists by email
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
-                var isNewUser = false;
+                  // Check if user exists by email
+                  var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
+                  var isNewUser = false;
 
-                // If user doesn't exist, create one
-                if (user == null)
-                {
-                    user = new User
-                    {
-                        Id = Guid.NewGuid(),
-                        FullName = payload.Name,
-                        Email = payload.Email,
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // Random password
-                        Role = "Customer",
-                        CreatedAt = DateTime.UtcNow,
-                        GoogleId = payload.Subject, // Store Google's unique user ID
-                        IsExternalLogin = true
-                    };
+                  // If user doesn't exist, create one
+                  if (user == null)
+                  {
+                      // Generate strong password using our utility class
+                      var randomPassword = PasswordUtils.GenerateStrongPassword();
 
-                    _context.Users.Add(user);
-                    await _context.SaveChangesAsync();
-                    isNewUser = true;
-                }
-                else if (string.IsNullOrEmpty(user.GoogleId))
-                {
-                    // If existing user doesn't have GoogleId, update it
-                    user.GoogleId = payload.Subject;
-                    user.IsExternalLogin = true;
-                    await _context.SaveChangesAsync();
-                }
+                      user = new User
+                      {
+                          Id = Guid.NewGuid(),
+                          FullName = payload.Name,
+                          Email = payload.Email,
+                          PasswordHash = BCrypt.Net.BCrypt.HashPassword(randomPassword),
+                          Role = "Customer",
+                          CreatedAt = DateTime.UtcNow,
+                          GoogleId = payload.Subject,
+                          IsExternalLogin = true
+                      };
 
-                // Generate tokens
-                var accessToken = GenerateAccessToken(user);
-                var refreshToken = GenerateRefreshToken(user);
+                      _context.Users.Add(user);
+                      await _context.SaveChangesAsync();
+                      isNewUser = true;
 
-                return new ExternalLoginResponseDTO
-                {
-                    AccessToken = accessToken,
-                    RefreshToken = refreshToken,
-                    ExpiresIn = 3600,
-                    UserId = user.Id,
-                    IsNewUser = isNewUser
-                };
+                      // Send email with generated password
+                      var subject = "Your Hotel Booking Account Password";
+                      var message = $@"
+                         <h2>Welcome to our Hotel Booking System!</h2>
+                         <p>You have successfully created an account using Google Sign-In.</p>
+                         <p>We have generated a secure password for your account:</p>
+                         <p style='background-color: #f5f5f5; padding: 10px; font-family: monospace; font-size: 16px;'><strong>{randomPassword}</strong></p>
+                         <p>You can continue using Google Sign-In or use this email and password combination to log in directly.</p>
+                         <p>For security reasons, we recommend changing this password after your first direct login.</p>
+                      ";
+
+                      await _emailService.SendEmailAsync(user.Email, subject, message);
+                  }
+                  else if (string.IsNullOrEmpty(user.GoogleId))
+                  {
+                      // If existing user doesn't have GoogleId, update it
+                      user.GoogleId = payload.Subject;
+                      user.IsExternalLogin = true;
+                      await _context.SaveChangesAsync();
+                  }
+
+                  // Generate tokens
+                  var accessToken = GenerateAccessToken(user);
+                  var refreshToken = GenerateRefreshToken(user);
+
+                  return new ExternalLoginResponseDTO
+                  {
+                      AccessToken = accessToken,
+                      RefreshToken = refreshToken,
+                      ExpiresIn = 3600,
+                      UserId = user.Id,
+                      IsNewUser = isNewUser
+                  };
             }
             catch (Exception ex)
             {

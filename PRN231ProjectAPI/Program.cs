@@ -36,6 +36,7 @@ builder.Services.Configure<VnPayConfig>(builder.Configuration.GetSection("VnPayC
 builder.Services.AddHostedService<PaymentExpirationService>();
 builder.Services.Configure<CloudinaryConfig>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.AddScoped<ImageService>();
+builder.Services.AddScoped<EmailService>();
 
 
 // 🔹 Cấu hình Redis (nếu dùng Redis)

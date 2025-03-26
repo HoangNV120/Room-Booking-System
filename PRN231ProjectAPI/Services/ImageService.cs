@@ -35,10 +35,10 @@ namespace PRN231ProjectAPI.Services
             try
             {
                 // Extract public_id from URL
-                Uri uri = new Uri(imageUrl);
-                string[] pathSegments = uri.AbsolutePath.Split('/');
-                string version = "";
-                string publicId = "";
+                var uri = new Uri(imageUrl);
+                var pathSegments = uri.AbsolutePath.Split('/');
+                var version = "";
+                var publicId = "";
                 
                 // Parse URL to find version and public ID
                 for (int i = 0; i < pathSegments.Length; i++)
@@ -77,7 +77,7 @@ namespace PRN231ProjectAPI.Services
                 await DeleteImageAsync(existingImageUrl);
             }
 
-            using var stream = image.OpenReadStream();
+            await using var stream = image.OpenReadStream();
 
             // Create upload params with options
             var uploadParams = new ImageUploadParams
@@ -86,7 +86,14 @@ namespace PRN231ProjectAPI.Services
                 Folder = _folder,
                 UseFilename = true,
                 UniqueFilename = true,
-                Overwrite = true
+                Overwrite = true,
+                Transformation = new CloudinaryDotNet.Transformation()
+                    .Width(1000)
+                    .Crop("scale")
+                    .Chain()
+                    .Quality("auto:best")
+                    .Chain()
+                    .FetchFormat("auto")
             };
 
             // If a custom name was provided, use it as the public ID

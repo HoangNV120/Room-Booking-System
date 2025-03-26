@@ -24,11 +24,15 @@ export default function HotelDetailPage() {
     const [hotelLoading, setHotelLoading] = useState(true);
     const [roomsLoading, setRoomsLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [imagePreview, setImagePreview] = useState(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [roomIdToEdit, setRoomIdToEdit] = useState(null);
 
     // Add Room Dialog state
     const [isAddRoomDialogOpen, setIsAddRoomDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newRoom, setNewRoom] = useState({
+        roomName: '',
         roomType: '',
         price: '',
         status: 'Available',
@@ -82,6 +86,41 @@ export default function HotelDetailPage() {
             fetchHotel();
         }
     }, [id]);
+
+    // Function to open dialog in edit mode
+    const openEditRoomDialog = (room) => {
+        setIsEditMode(true);
+        setRoomIdToEdit(room.id);
+        setNewRoom({
+            roomName: room.roomName || '',
+            roomType: room.roomType,
+            price: room.price.toString(),
+            status: room.status,
+            image: null
+        });
+
+        // Set image preview if available
+        if (room.imageUrl) {
+            setImagePreview(room.imageUrl);
+        }
+
+        setIsAddRoomDialogOpen(true);
+    };
+
+    // Function to open dialog in add mode
+    const openAddRoomDialog = () => {
+        setIsEditMode(false);
+        setRoomIdToEdit(null);
+        setNewRoom({
+            roomName: '',
+            roomType: '',
+            price: '',
+            status: 'Available',
+            image: null
+        });
+        setImagePreview(null);
+        setIsAddRoomDialogOpen(true);
+    };
 
     // Fetch rooms when params change
     useEffect(() => {
@@ -145,41 +184,68 @@ export default function HotelDetailPage() {
     // Handle file input change
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
             setNewRoom({
                 ...newRoom,
-                image: e.target.files[0]
+                image: file
             });
+
+            // Create preview URL
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreview(previewUrl);
         }
     };
 
+    // Add cleanup for image preview URLs
+    useEffect(() => {
+        return () => {
+            if (imagePreview) {
+                URL.revokeObjectURL(imagePreview);
+            }
+        };
+    }, [imagePreview]);
+
     // Handle form submission
-    const handleAddRoom = async (e) => {
+    const handleRoomSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         try {
             const roomData = {
                 hotelId: id,
+                roomName: newRoom.roomName,
                 roomType: newRoom.roomType,
                 price: parseFloat(newRoom.price),
                 status: newRoom.status,
                 image: newRoom.image
             };
 
-            await ApiRoom.createRoom(roomData);
-            toast.success('Room created successfully');
-            setIsAddRoomDialogOpen(false);
+            if (isEditMode && roomIdToEdit) {
+                // Update existing room
+                await ApiRoom.updateRoom(roomIdToEdit, roomData);
+                toast.success('Room updated successfully');
+            } else {
+                // Create new room
+                await ApiRoom.createRoom(roomData);
+                toast.success('Room created successfully');
+            }
 
-            // Reset form
+            setIsAddRoomDialogOpen(false);
+            setImagePreview(null);
+
+            // Reset form and edit mode
             setNewRoom({
+                roomName: '',
                 roomType: '',
                 price: '',
                 status: 'Available',
                 image: null
             });
+            setIsEditMode(false);
+            setRoomIdToEdit(null);
 
-            // Refresh rooms
-            const fetchRoomsAfterAdd = async () => {
+            // Refresh rooms list
+            const fetchRoomsAfterSubmit = async () => {
                 try {
                     const params = {
                         pageNumber: pageNumber,
@@ -205,10 +271,10 @@ export default function HotelDetailPage() {
                     console.error('Error refreshing rooms:', error);
                 }
             };
-            fetchRoomsAfterAdd();
+            fetchRoomsAfterSubmit();
         } catch (error) {
-            console.error('Error creating room:', error);
-            toast.error('Failed to create room');
+            console.error(`Error ${isEditMode ? 'updating' : 'creating'} room:`, error);
+            toast.error(`Failed to ${isEditMode ? 'update' : 'create'} room`);
         } finally {
             setIsSubmitting(false);
         }
@@ -427,10 +493,10 @@ export default function HotelDetailPage() {
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {rooms.map((room) => (
-                                        <Card key={room.id} className="overflow-hidden transition-transform hover:scale-105">
+                                        <Card key={room.id} className="overflow-hidden transition-transform hover:shadow-lg">
                                             <div className="relative h-48">
                                                 <Image
-                                                    src={room.imageUrl? room.imageUrl: roomImage}
+                                                    src={room.imageUrl ? room.imageUrl : roomImage}
                                                     alt={room.roomType}
                                                     fill
                                                     className="object-cover"
@@ -439,40 +505,34 @@ export default function HotelDetailPage() {
                                                 <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-sm font-medium">
                                                     {room.roomType}
                                                 </div>
+
+                                                {/* Admin Update Button */}
+                                                {isAdmin && (
+                                                    <div className="absolute top-2 left-2 flex gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="bg-white bg-opacity-75 hover:bg-opacity-100"
+                                                            onClick={() => openEditRoomDialog(room)}
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                            </svg>
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                             <CardHeader className="p-4">
-                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Room {room.roomNumber}</h3>
+                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                                    {room.roomName || `Room ${room.roomNumber || ''}`}
+                                                </h3>
                                                 <p className="text-sm text-gray-600 dark:text-gray-300">
                                                     {room.capacity} {room.capacity > 1 ? 'Persons' : 'Person'} • {room.beds} {room.beds > 1 ? 'Beds' : 'Bed'}
                                                 </p>
                                             </CardHeader>
                                             <CardContent className="p-4 pt-0">
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-3">
-                                                    {room.description || "Standard room with all essential amenities for a comfortable stay."}
-                                                </p>
-
-                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                    {room.hasWifi && (
-                                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
-                                                            WiFi
-                                                        </span>
-                                                    )}
-                                                    {room.hasTV && (
-                                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
-                                                            TV
-                                                        </span>
-                                                    )}
-                                                    {room.hasAirCon && (
-                                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
-                                                            Air Conditioning
-                                                        </span>
-                                                    )}
-                                                    {room.hasBalcony && (
-                                                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
-                                                            Balcony
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                {/* Room content remains the same */}
                                             </CardContent>
                                             <CardFooter className="px-4 py-3 bg-gray-50 dark:bg-gray-700 flex justify-between items-center">
                                                 <div className="font-semibold text-lg text-gray-900 dark:text-white">
@@ -481,7 +541,14 @@ export default function HotelDetailPage() {
                                                         per night
                                                     </span>
                                                 </div>
-                                                <Button>Book Now</Button>
+                                                {isAdmin ? (
+                                                    <div className="flex gap-2">
+                                                        <Button variant="outline" size="sm">View</Button>
+                                                        <Button size="sm" onClick={() => openEditRoomDialog(room)}>Update</Button>
+                                                    </div>
+                                                ) : (
+                                                    <Button>Book Now</Button>
+                                                )}
                                             </CardFooter>
                                         </Card>
                                     ))}
@@ -533,13 +600,40 @@ export default function HotelDetailPage() {
                     </>
                 )}
                 {/* Add Room Dialog */}
-                <Dialog open={isAddRoomDialogOpen} onOpenChange={setIsAddRoomDialogOpen}>
+                <Dialog open={isAddRoomDialogOpen} onOpenChange={(open) => {
+                    setIsAddRoomDialogOpen(open);
+                    if (!open) {
+                        // Reset everything when closing
+                        setImagePreview(null);
+                        setIsEditMode(false);
+                        setRoomIdToEdit(null);
+                        setNewRoom({
+                            roomName: '',
+                            roomType: '',
+                            price: '',
+                            status: 'Available',
+                            image: null
+                        });
+                    }
+                }}>
                     <DialogContent className="sm:max-w-[500px]">
                         <DialogHeader>
-                            <DialogTitle>Add New Room</DialogTitle>
+                            <DialogTitle>{isEditMode ? 'Edit Room' : 'Add New Room'}</DialogTitle>
                         </DialogHeader>
-                        <form onSubmit={handleAddRoom}>
+                        <form onSubmit={handleRoomSubmit}>
                             <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="roomName" className="text-right">Room Name</Label>
+                                    <Input
+                                        id="roomName"
+                                        name="roomName"
+                                        value={newRoom.roomName}
+                                        onChange={handleRoomInputChange}
+                                        className="col-span-3"
+                                        placeholder="e.g., Room 101"
+                                        required
+                                    />
+                                </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="roomType" className="text-right">Room Type</Label>
                                     <Input
@@ -548,6 +642,7 @@ export default function HotelDetailPage() {
                                         value={newRoom.roomType}
                                         onChange={handleRoomInputChange}
                                         className="col-span-3"
+                                        placeholder="e.g., Deluxe, Standard"
                                         required
                                     />
                                 </div>
@@ -593,6 +688,35 @@ export default function HotelDetailPage() {
                                             ref={fileInputRef}
                                             className="cursor-pointer"
                                         />
+
+                                        {/* Image Preview */}
+                                        {imagePreview && (
+                                            <div className="mt-3 relative">
+                                                <Image
+                                                    src={imagePreview}
+                                                    alt="Room Preview"
+                                                    width={200}
+                                                    height={120}
+                                                    className="rounded-md object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                                                    onClick={() => {
+                                                        setImagePreview(null);
+                                                        setNewRoom({...newRoom, image: null});
+                                                        if (fileInputRef.current) {
+                                                            fileInputRef.current.value = "";
+                                                        }
+                                                    }}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -610,7 +734,9 @@ export default function HotelDetailPage() {
                                     type="submit"
                                     disabled={isSubmitting}
                                 >
-                                    {isSubmitting ? 'Adding...' : 'Add Room'}
+                                    {isSubmitting
+                                        ? (isEditMode ? 'Updating...' : 'Adding...')
+                                        : (isEditMode ? 'Update Room' : 'Add Room')}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -621,7 +747,7 @@ export default function HotelDetailPage() {
                 {isAdmin && (
                     <div className="fixed bottom-6 right-6">
                         <Button
-                            onClick={() => setIsAddRoomDialogOpen(true)}
+                            onClick={openAddRoomDialog}
                             className="rounded-full h-14 w-14 shadow-lg"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

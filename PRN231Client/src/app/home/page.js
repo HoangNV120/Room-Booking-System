@@ -1,40 +1,26 @@
 // src/app/home/page.js
-'use client';
-
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import MainLayout from '@/components/layouts/MainLayout';
 import { ApiHotel } from '@/services/ApiHotel';
-import { toast } from 'sonner';
 
-export default function HomePage() {
-    const [hotels, setHotels] = useState([]);
-    const [loading, setLoading] = useState(true);
+export async function generateMetadata() {
+    return {
+        title: 'Hotel Booking - Find Your Perfect Stay',
+        description: 'Discover the best hotels and rooms for your next adventure'
+    };
+}
+
+export default async function HomePage() {
     const defaultImageUrl = "https://vanangroup.com.vn/wp-content/uploads/2024/10/29df21cd740c64fda44d8e567685970b-e1729733600172.jpg";
 
-    useEffect(() => {
-        const fetchHotels = async () => {
-            try {
-                const response = await ApiHotel.getHotels({
-                    pageNumber: 1,
-                    pageSize: 3, // Fetch only 3 hotels for the featured section
-                    sortDescending: false
-                });
+    const response = await ApiHotel.getHotels({
+        pageNumber: 1,
+        pageSize: 3,
+        sortDescending: false
+    });
 
-                if (response.data && response.data.data && response.data.data.items) {
-                    setHotels(response.data.data.items);
-                }
-            } catch (error) {
-                console.error('Error fetching hotels:', error);
-                toast.error('Failed to load hotels');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHotels();
-    }, []);
+    const hotels = response.data?.data?.items || [];
 
     return (
         <MainLayout>
@@ -68,27 +54,7 @@ export default function HomePage() {
                 <div className="mt-12">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Featured Hotels</h2>
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {loading ? (
-                            // Loading skeleton placeholders
-                            Array(3).fill().map((_, index) => (
-                                <div key={index} className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-                                    <div className="relative h-48">
-                                        <div className="bg-gray-200 dark:bg-gray-700 animate-pulse h-full w-full"></div>
-                                    </div>
-                                    <div className="px-4 py-4">
-                                        <div className="h-4 bg-gray-200 dark:bg-gray-700 animate-pulse rounded w-3/4 mb-2"></div>
-                                        <div className="h-3 bg-gray-200 dark:bg-gray-700 animate-pulse rounded w-full mb-2"></div>
-                                        <div className="h-3 bg-gray-200 dark:bg-gray-700 animate-pulse rounded w-2/3"></div>
-                                    </div>
-                                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700">
-                                        <div className="flex justify-between">
-                                            <div className="h-5 bg-gray-200 dark:bg-gray-600 animate-pulse rounded w-1/4"></div>
-                                            <div className="h-5 bg-gray-200 dark:bg-gray-600 animate-pulse rounded w-1/4"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        ) : hotels.length > 0 ? (
+                        {hotels.length > 0 ? (
                             // Actual hotel data
                             hotels.map((hotel) => (
                                 <div key={hotel.id} className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-transform hover:scale-105">

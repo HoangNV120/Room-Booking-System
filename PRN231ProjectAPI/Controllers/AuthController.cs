@@ -21,8 +21,7 @@ namespace PRN231ProjectAPI.Controllers
         }
 
         [HttpPost("signup")]
-        [ProducesResponseType(typeof(ApiResponse<SignUpResponseDTO>), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
         public async Task<IActionResult> SignUp([FromBody] SignUpRequestDTO request)
         {
@@ -32,8 +31,23 @@ namespace PRN231ProjectAPI.Controllers
             var result = await _authService.SignUp(request);
             if (result == null)
                 throw new ConflictException("Email already exists");
+            
+            return Ok(new ApiResponse<SignUpResponseDTO>(201, "Verification code sent", result));
+        }
 
-            return StatusCode(201, new ApiResponse<SignUpResponseDTO>(201, "User registered successfully", result));
+        [HttpPost("verify")]
+        [ProducesResponseType(typeof(ApiResponse<SignUpResponseDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> VerifyEmail([FromBody] VerificationRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+                throw new BadRequestException("Invalid request data");
+        
+            var result = await _authService.VerifyRegistration(request);
+            if (result == null)
+                throw new BadRequestException("Invalid or expired verification code");
+        
+            return Ok(new ApiResponse<SignUpResponseDTO>(200, "Email verified and registration completed", result));
         }
 
         [HttpPost("login")]

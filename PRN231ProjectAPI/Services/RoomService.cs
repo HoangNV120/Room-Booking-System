@@ -84,11 +84,11 @@ namespace PRN231ProjectAPI.Services
             room.CreatedAt = DateTime.Now;
 
             // Upload image if provided
-            string imageUrl = string.Empty;
+            var imageUrl = string.Empty;
             if (request.Image != null && request.Image.Length > 0)
             {
                 // Use room_roomId naming convention
-                string imageName = $"room_{room.Id}";
+                var imageName = $"room_{room.Id}";
                 imageUrl = await _imageService.UploadImageAsync(request.Image, null, imageName);
             }
 
@@ -111,19 +111,17 @@ namespace PRN231ProjectAPI.Services
                 var hotel = await _context.Hotels.FindAsync(request.HotelId.Value);
                 if (hotel == null)
                     throw new NotFoundException($"Hotel with ID {request.HotelId} not found");
-
-                room.HotelId = request.HotelId.Value;
             }
+            
+            _mapper.Map(request, room);
 
-            if (request.RoomType != null)
-                room.RoomType = request.RoomType;
-
-            if (request.Price.HasValue)
-                room.Price = request.Price.Value;
-
-            if (request.Status != null)
-                room.Status = request.Status;
-
+            // Upload image if provided
+            if (request.Image != null && request.Image.Length > 0)
+            {
+                string imageName = $"room_{id}";
+                room.ImageUrl = await _imageService.UploadImageAsync(request.Image, room.ImageUrl, imageName);
+            }
+            
             await _context.SaveChangesAsync();
 
             var updatedRoom = await _context.Rooms

@@ -49,4 +49,12 @@ export class ApiAuth {
             url: baseUrlAuth + "/user-info",
         });
     }
+
+    static verify(request) {
+        return http({
+            method: "POST",
+            url: baseUrlAuth + "/verify",
+            data: request,
+        });
+    }
 }

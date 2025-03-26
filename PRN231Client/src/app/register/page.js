@@ -81,7 +81,7 @@ export default function Register() {
 
         ApiAuth.signUp(request)
             .then(response => {
-                toast.success("Registration successful! Please log in.");
+                toast.success("Registration successful! A verification email has been sent. Please verify your email to activate your account.");
                 router.push('/login');
             })
             .catch(err => {

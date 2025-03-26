@@ -4,6 +4,7 @@
     {
         public Guid Id { get; set; }
         public Guid HotelId { get; set; }
+        public string RoomName { get; set; } = null!;
         public string HotelName { get; set; } = null!;
         public string RoomType { get; set; } = null!;
         public decimal Price { get; set; }

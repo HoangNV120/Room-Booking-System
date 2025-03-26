@@ -32,7 +32,7 @@ export default function Login() {
 
         if (hasToken) {
             toast.info("You are already logged in");
-
+            
             // Try to get the referrer (the page that sent the user to login)
             const referrer = document.referrer;
             const isInternalReferrer = referrer && referrer.includes(window.location.host);

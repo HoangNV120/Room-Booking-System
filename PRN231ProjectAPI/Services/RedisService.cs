@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
 using System;
+using System.Text.Json;
 using System.Threading.Tasks;
+using PRN231ProjectAPI.DTOs.Auth;
 
 namespace PRN231ProjectAPI.Services
 {
@@ -34,6 +36,54 @@ namespace PRN231ProjectAPI.Services
 
             var value = await _cache.GetStringAsync($"blacklist:{jti}");
             return value != null;
+        }
+
+        // Cache registration data with verification code
+        public async Task CacheRegistrationDataAsync(SignUpRequestDTO userData, string verificationCode)
+        {
+            if (userData == null || string.IsNullOrEmpty(verificationCode))
+                return;
+            
+            var userJson = JsonSerializer.Serialize(userData);
+            await _cache.SetStringAsync(
+                $"registration:{userData.Email}",
+                userJson,
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)
+                });
+                
+            // Store verification code separately
+            await _cache.SetStringAsync(
+                $"verification:{userData.Email}",
+                verificationCode,
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)
+                });
+        }
+
+        // Get registration data by email
+        public async Task<SignUpRequestDTO> GetRegistrationDataAsync(string email)
+        {
+            var userJson = await _cache.GetStringAsync($"registration:{email}");
+            if (string.IsNullOrEmpty(userJson))
+                return null;
+                
+            return JsonSerializer.Deserialize<SignUpRequestDTO>(userJson);
+        }
+
+        // Get verification code by email
+        public async Task<string> GetVerificationCodeAsync(string email)
+        {
+            return await _cache.GetStringAsync($"verification:{email}");
+        }
+
+        // Remove registration data and verification code
+        public async Task RemoveRegistrationDataAsync(string email)
+        {
+            await _cache.RemoveAsync($"registration:{email}");
+            await _cache.RemoveAsync($"verification:{email}");
         }
     }
 }

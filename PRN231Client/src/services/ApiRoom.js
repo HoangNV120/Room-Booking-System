@@ -33,6 +33,7 @@ export class ApiRoom {
 
         // Add text fields to the form data
         formData.append('hotelId', request.hotelId);
+        formData.append('roomName', request.roomName);
         formData.append('roomType', request.roomType);
         formData.append('price', request.price);
 
@@ -57,10 +58,31 @@ export class ApiRoom {
     }
 
     static updateRoom(id, request) {
+        // Create a FormData object to handle file uploads
+        const formData = new FormData();
+
+        // Add text fields to the form data
+        formData.append('hotelId', request.hotelId);
+        formData.append('roomName', request.roomName);
+        formData.append('roomType', request.roomType);
+        formData.append('price', request.price);
+
+        // Add status if provided, otherwise it will default to "Available" on the server
+        if (request.status) {
+            formData.append('status', request.status);
+        }
+
+        // Add image file if provided
+        if (request.image instanceof File) {
+            formData.append('image', request.image);
+        }
         return http({
             method: "PUT",
             url: `${baseUrlRoom}/${id}`,
-            data: request
+            data: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
         });
     }
 
