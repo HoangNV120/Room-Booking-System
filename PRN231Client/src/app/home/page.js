@@ -60,7 +60,7 @@ export default async function HomePage() {
                                 <div key={hotel.id} className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg transition-transform hover:scale-105">
                                     <div className="relative h-48">
                                         <Image
-                                            src={defaultImageUrl}
+                                            src={hotel.imageUrl || defaultImageUrl}
                                             alt={hotel.name}
                                             fill
                                             className="object-cover"

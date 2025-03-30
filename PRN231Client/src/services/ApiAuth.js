@@ -57,4 +57,19 @@ export class ApiAuth {
             data: request,
         });
     }
+    static forgotPassword(request) {
+        return http({
+            method: "POST",
+            url: baseUrlAuth + "/forgot-password",
+            data: request,
+        });
+    }
+
+    static resetPassword(request) {
+        return http({
+            method: "POST",
+            url: baseUrlAuth + "/reset-password",
+            data: request,
+        });
+    }
 }

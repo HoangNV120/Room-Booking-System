@@ -24,19 +24,49 @@ export class ApiHotel {
         });
     }
 
-    static createHotel(hotelData) {
+    static createHotel(request) {
+        const formData = new FormData();
+
+        // Add hotel data to FormData
+        formData.append("name", request.name);
+        formData.append("address", request.address);
+        formData.append("description", request.description);
+
+        // Add image if present
+        if (request.image) {
+            formData.append("image", request.image);
+        }
+
         return http({
             method: "POST",
             url: baseUrlHotel,
-            data: hotelData
+            data: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
         });
     }
 
-    static updateHotel(id, hotelData) {
+    static updateHotel(id, request) {
+        const formData = new FormData();
+
+        // Add hotel data to FormData
+        formData.append("name", request.name);
+        formData.append("address", request.address);
+        formData.append("description", request.description);
+
+        // Add image if present
+        if (request.image) {
+            formData.append("image", request.image);
+        }
+
         return http({
             method: "PUT",
             url: `${baseUrlHotel}/${id}`,
-            data: hotelData
+            data: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
         });
     }
 

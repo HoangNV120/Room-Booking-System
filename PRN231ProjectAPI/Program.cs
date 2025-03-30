@@ -30,13 +30,14 @@ builder.Services.AddScoped<RedisService>();
 builder.Services.AddScoped<RoomService>();
 builder.Services.AddScoped<HotelService>();
 builder.Services.AddScoped<BookingService>();
-builder.Services.AddScoped<PaymentService>();
 builder.Services.AddHttpContextAccessor(); 
 builder.Services.Configure<VnPayConfig>(builder.Configuration.GetSection("VnPayConfig"));
-builder.Services.AddHostedService<PaymentExpirationService>();
+builder.Services.AddHostedService<BookingExpirationService>();
 builder.Services.Configure<CloudinaryConfig>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.AddScoped<ImageService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddHttpClient<TurnstileService>();
+builder.Services.AddScoped<TurnstileService>();
 
 
 // 🔹 Cấu hình Redis (nếu dùng Redis)

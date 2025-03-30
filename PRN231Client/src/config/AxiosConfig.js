@@ -59,9 +59,12 @@ http.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
+        
+        
 
         // Check if error is 401 and not "Invalid credentials" message
-        const isInvalidCredentials = error.response?.message === "Invalid credentials";
+        const isInvalidCredentials = error.response?.data?.message === "Invalid username or password";
+        console.log(isInvalidCredentials);
 
         // Only attempt refresh i   f it's a 401 error, not for invalid credentials, and not already retrying
         if (error.response?.status === 401 && !isInvalidCredentials && !originalRequest._retry) {

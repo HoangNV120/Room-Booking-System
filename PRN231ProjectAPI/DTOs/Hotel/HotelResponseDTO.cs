@@ -8,4 +8,5 @@ public class HotelResponseDTO
     public string? Description { get; set; }
     public double? Rating { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public string? ImageUrl { get; set; }
 }

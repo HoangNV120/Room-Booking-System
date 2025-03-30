@@ -16,6 +16,7 @@ namespace PRN231ProjectAPI.Models
         public string? Description { get; set; }
         public double? Rating { get; set; }
         public DateTime? CreatedAt { get; set; }
+        public string? ImageUrl { get; set; }
 
         public virtual ICollection<Room> Rooms { get; set; }
     }

@@ -2,7 +2,7 @@
 
 import {useState, useEffect, useRef} from 'react';
 import Image from 'next/image';
-import { useParams } from 'next/navigation';
+import {useParams, useRouter} from 'next/navigation';
 import { toast } from 'sonner';
 import MainLayout from '@/components/layouts/MainLayout';
 import { ApiHotel } from '@/services/ApiHotel';
@@ -15,6 +15,11 @@ import { ArrowUpDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format, addDays, isBefore, differenceInDays } from "date-fns";
+import { ApiBooking } from "@/services/ApiBooking";
 
 export default function HotelDetailPage() {
     const { id } = useParams();
@@ -27,7 +32,13 @@ export default function HotelDetailPage() {
     const [imagePreview, setImagePreview] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [roomIdToEdit, setRoomIdToEdit] = useState(null);
-
+    const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+    const [selectedRoom, setSelectedRoom] = useState(null);
+    const [checkInDate, setCheckInDate] = useState(new Date());
+    const [checkOutDate, setCheckOutDate] = useState(addDays(new Date(), 1));
+    const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
+    const router = useRouter();
+    
     // Add Room Dialog state
     const [isAddRoomDialogOpen, setIsAddRoomDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,6 +70,18 @@ export default function HotelDetailPage() {
     const hotelImage = "https://vanangroup.com.vn/wp-content/uploads/2024/10/29df21cd740c64fda44d8e567685970b-e1729733600172.jpg";
     const roomImage = "https://media.architecturaldigest.com/photos/659d9cb42446c7171718ecf0/master/w_1600%2Cc_limit/atr.royalmansion-bedroom2-mr.jpg";
 
+    // Hotel Edit Dialog state
+    const [isEditHotelDialogOpen, setIsEditHotelDialogOpen] = useState(false);
+    const [isHotelSubmitting, setIsHotelSubmitting] = useState(false);
+    const [editedHotel, setEditedHotel] = useState({
+        name: '',
+        address: '',
+        description: '',
+        image: null
+    });
+    const [hotelImagePreview, setHotelImagePreview] = useState(null);
+    const hotelFileInputRef = useRef(null);
+    
     // Check if user is admin
     useEffect(() => {
         const userRole = localStorage.getItem('role');
@@ -122,6 +145,102 @@ export default function HotelDetailPage() {
         setIsAddRoomDialogOpen(true);
     };
 
+    // Function to open dialog for hotel editing
+    const openEditHotelDialog = (hotel) => {
+        setEditedHotel({
+            name: hotel.name || '',
+            address: hotel.address || '',
+            description: hotel.description || '',
+            image: null
+        });
+
+        // Set image preview if available
+        setHotelImagePreview(hotelImage); // Use current hotel image
+
+        setIsEditHotelDialogOpen(true);
+    };
+
+    // Handle hotel form input changes
+    const handleHotelInputChange = (e) => {
+        const { name, value } = e.target;
+        setEditedHotel({
+            ...editedHotel,
+            [name]: value
+        });
+    };
+
+// Handle hotel image change
+    const handleHotelImageChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setEditedHotel({
+                ...editedHotel,
+                image: file
+            });
+
+            // Create preview URL
+            const previewUrl = URL.createObjectURL(file);
+            setHotelImagePreview(previewUrl);
+        }
+    };
+
+// Handle hotel form submission
+    const handleHotelSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!hotel || !hotel.id) {
+            toast.error('Hotel information is missing');
+            return;
+        }
+
+        // Check that required fields are present
+        if (!editedHotel.name || !editedHotel.address) {
+            toast.error('Name and address are required');
+            return;
+        }
+
+        setIsHotelSubmitting(true);
+        toast.loading('Updating hotel information...', { id: 'updateHotel' });
+
+        try {
+            // Create request object with the edited hotel data
+            const request = {
+                name: editedHotel.name,
+                address: editedHotel.address,
+                description: editedHotel.description || ''
+            };
+
+            // If there's a new image, include it
+            if (editedHotel.image instanceof File) {
+                request.image = editedHotel.image;
+            }
+
+            // Call API to update hotel
+            const response = await ApiHotel.updateHotel(hotel.id, request);
+
+            if (response.data && response.data.data) {
+                // Update the hotel state with new data
+                setHotel(response.data.data);
+                toast.success('Hotel updated successfully');
+                setIsEditHotelDialogOpen(false);
+            }
+        } catch (error) {
+            console.error('Error updating hotel:', error);
+            toast.error(error.response?.data?.message || 'Failed to update hotel');
+        } finally {
+            setIsHotelSubmitting(false);
+            toast.dismiss('updateHotel');
+        }
+    };
+
+    useEffect(() => {
+        // Skip if no rooms or if we already have room types
+        if (rooms.length > 0 && roomTypes.length === 0) {
+            const types = [...new Set(rooms.map(room => room.roomType))];
+            setRoomTypes(types);
+        }
+    }, [rooms, roomTypes.length]);
+
     // Fetch rooms when params change
     useEffect(() => {
         const fetchRooms = async () => {
@@ -169,7 +288,7 @@ export default function HotelDetailPage() {
         if (id) {
             fetchRooms();
         }
-    }, [id, pageNumber, pageSize, sortDescending, filterType, roomTypes.length]);
+    }, [id, pageNumber, pageSize, sortDescending, filterType]);
 
 
     // Handle new room form input changes
@@ -351,6 +470,45 @@ export default function HotelDetailPage() {
         return items;
     };
 
+    // Function to handle booking submission
+    const handleBookingSubmit = async () => {
+        if (!selectedRoom || !checkInDate || !checkOutDate) {
+            toast.error('Please select all required information');
+            return;
+        }
+
+        const accessToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+        if (!accessToken) {
+            toast.error('You must be logged in to book a room');
+            router.push('/login');
+            return;
+        }
+
+        setIsBookingSubmitting(true);
+        toast.info('Processing your booking request...');
+
+        try {
+            const bookingData = {
+                roomId: selectedRoom.id,
+                checkInDate: checkInDate.toISOString(),
+                checkOutDate: checkOutDate.toISOString(),
+                returnUrl: window.location.origin + '/check-booking'
+            };
+
+            const response = await ApiBooking.createBooking(bookingData);
+
+            // Always redirect to bookings page after successful booking
+            toast.success('Booking created successfully');
+            router.push('/bookings');
+
+        } catch (error) {
+            console.error('Error creating booking:', error);
+            toast.error(error.response?.data?.message || 'Failed to create booking');
+        } finally {
+            setIsBookingSubmitting(false);
+        }
+    };
+
     return (
         <MainLayout>
             <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -367,7 +525,7 @@ export default function HotelDetailPage() {
                     <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden mb-8">
                         <div className="relative h-64 sm:h-80">
                             <Image
-                                src={hotelImage}
+                                src={hotel.imageUrl || hotelImage}
                                 alt={hotel.name}
                                 fill
                                 className="object-cover"
@@ -377,24 +535,31 @@ export default function HotelDetailPage() {
                         <div className="p-6">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{hotel.name}</h1>
-                                <div className="flex items-center mt-2 sm:mt-0 bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
-                                    <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                    <span className="ml-1 text-sm font-semibold text-gray-800 dark:text-gray-200">
-                                        {hotel.rating ? hotel.rating.toFixed(1) : 'N/A'}
-                                    </span>
+                                <div className="flex items-center gap-3">
+                                    {isAdmin && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => openEditHotelDialog(hotel)}
+                                            className="flex items-center gap-1"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                            Edit Hotel
+                                        </Button>
+                                    )}
+                                    <div className="flex items-center bg-blue-100 dark:bg-blue-900 px-3 py-1 rounded-full">
+                                        <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                        <span className="ml-1 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {hotel.rating ? hotel.rating.toFixed(1) : 'N/A'}
+                </span>
+                                    </div>
                                 </div>
                             </div>
-
-                            <p className="text-gray-600 dark:text-gray-300 mb-4">
-                                <span className="inline-block mr-2">📍</span>
-                                {hotel.address}
-                            </p>
-
-                            <p className="text-gray-700 dark:text-gray-300">
-                                {hotel.description || "No description available for this hotel."}
-                            </p>
                         </div>
                     </div>
                 ) : (
@@ -547,7 +712,12 @@ export default function HotelDetailPage() {
                                                         <Button size="sm" onClick={() => openEditRoomDialog(room)}>Update</Button>
                                                     </div>
                                                 ) : (
-                                                    <Button>Book Now</Button>
+                                                    <Button onClick={() => {
+                                                        setSelectedRoom(room);
+                                                        setIsBookingDialogOpen(true);
+                                                    }}>
+                                                        Book Now
+                                                    </Button>
                                                 )}
                                             </CardFooter>
                                         </Card>
@@ -737,6 +907,253 @@ export default function HotelDetailPage() {
                                     {isSubmitting
                                         ? (isEditMode ? 'Updating...' : 'Adding...')
                                         : (isEditMode ? 'Update Room' : 'Add Room')}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Booking Dialog */}
+                <Dialog open={isBookingDialogOpen} onOpenChange={(open) => {
+                    setIsBookingDialogOpen(open);
+                    if (!open) {
+                        // Reset booking form when closing
+                        setSelectedRoom(null);
+                        setCheckInDate(new Date());
+                        setCheckOutDate(addDays(new Date(), 1));
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                            <DialogTitle>Book Room</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            handleBookingSubmit();
+                        }}>
+                            <div className="grid gap-6 py-4">
+                                {selectedRoom && (
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative h-20 w-32">
+                                            <Image
+                                                src={selectedRoom.imageUrl || roomImage}
+                                                alt={selectedRoom.roomType}
+                                                fill
+                                                className="object-cover rounded-md"
+                                            />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium">{selectedRoom.roomName || `Room ${selectedRoom.roomNumber || ''}`}</h3>
+                                            <p className="text-sm text-gray-500">{selectedRoom.roomType}</p>
+                                            <p className="text-sm font-medium">{selectedRoom.price.toLocaleString('vi-VN')} ₫ per night</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="checkInDate" className="text-right">Check-in</Label>
+                                    <div className="col-span-3">
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full justify-start text-left font-normal"
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {checkInDate ? format(checkInDate, 'PPP') : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={checkInDate}
+                                                    onSelect={(date) => {
+                                                        setCheckInDate(date);
+                                                        // Ensure check-out is always after check-in
+                                                        if (date && checkOutDate && !isBefore(date, checkOutDate)) {
+                                                            setCheckOutDate(addDays(date, 1));
+                                                        }
+                                                    }}
+                                                    disabled={(date) => isBefore(date, new Date())}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="checkOutDate" className="text-right">Check-out</Label>
+                                    <div className="col-span-3">
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full justify-start text-left font-normal"
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {checkOutDate ? format(checkOutDate, 'PPP') : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={checkOutDate}
+                                                    onSelect={setCheckOutDate}
+                                                    disabled={(date) =>
+                                                        isBefore(date, new Date()) ||
+                                                        (checkInDate && isBefore(date, checkInDate))
+                                                    }
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+
+                                {checkInDate && checkOutDate && (
+                                    <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                                            <span className="font-medium">Stay Duration:</span> {differenceInDays(checkOutDate, checkInDate)} nights
+                                        </p>
+                                        {selectedRoom && (
+                                            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                                                <span className="font-medium">Total Price:</span> {(selectedRoom.price * differenceInDays(checkOutDate, checkInDate)).toLocaleString('vi-VN')} ₫
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsBookingDialogOpen(false)}
+                                    disabled={isBookingSubmitting}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isBookingSubmitting || !checkInDate || !checkOutDate}
+                                >
+                                    {isBookingSubmitting ? 'Processing...' : 'Confirm Booking'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Hotel Edit Dialog */}
+                <Dialog open={isEditHotelDialogOpen} onOpenChange={(open) => {
+                    setIsEditHotelDialogOpen(open);
+                    if (!open) {
+                        // Reset when closing
+                        setHotelImagePreview(null);
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                            <DialogTitle>Edit Hotel Details</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleHotelSubmit}>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="hotelName" className="text-right">Hotel Name</Label>
+                                    <Input
+                                        id="hotelName"
+                                        name="name"
+                                        value={editedHotel.name}
+                                        onChange={handleHotelInputChange}
+                                        className="col-span-3"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="hotelAddress" className="text-right">Address</Label>
+                                    <Input
+                                        id="hotelAddress"
+                                        name="address"
+                                        value={editedHotel.address}
+                                        onChange={handleHotelInputChange}
+                                        className="col-span-3"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-4 items-start gap-4">
+                                    <Label htmlFor="hotelDescription" className="text-right pt-2">Description</Label>
+                                    <textarea
+                                        id="hotelDescription"
+                                        name="description"
+                                        value={editedHotel.description}
+                                        onChange={handleHotelInputChange}
+                                        rows="4"
+                                        className="col-span-3 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="hotelImage" className="text-right">Image</Label>
+                                    <div className="col-span-3">
+                                        <Input
+                                            id="hotelImage"
+                                            name="image"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleHotelImageChange}
+                                            ref={hotelFileInputRef}
+                                            className="cursor-pointer"
+                                        />
+
+                                        {/* Image Preview */}
+                                        {hotelImagePreview && (
+                                            <div className="mt-3 relative">
+                                                <Image
+                                                    src={hotelImagePreview}
+                                                    alt="Hotel Preview"
+                                                    width={200}
+                                                    height={120}
+                                                    className="rounded-md object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                                                    onClick={() => {
+                                                        setHotelImagePreview(null);
+                                                        setEditedHotel({...editedHotel, image: null});
+                                                        if (hotelFileInputRef.current) {
+                                                            hotelFileInputRef.current.value = "";
+                                                        }
+                                                    }}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsEditHotelDialogOpen(false)}
+                                    disabled={isHotelSubmitting}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isHotelSubmitting}
+                                >
+                                    {isHotelSubmitting ? 'Saving...' : 'Save Changes'}
                                 </Button>
                             </DialogFooter>
                         </form>

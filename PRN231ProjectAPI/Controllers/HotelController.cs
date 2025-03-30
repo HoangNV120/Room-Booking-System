@@ -55,8 +55,9 @@ namespace PRN231ProjectAPI.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
+        [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<HotelResponseDTO>), StatusCodes.Status201Created)]
-        public async Task<IActionResult> CreateHotel([FromBody] HotelCreateDTO request)
+        public async Task<IActionResult> CreateHotel([FromForm] HotelCreateDTO request)
         {
             try
             {
@@ -71,9 +72,10 @@ namespace PRN231ProjectAPI.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
+        [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<HotelResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdateHotel(Guid id, [FromBody] HotelUpdateDTO request)
+        public async Task<IActionResult> UpdateHotel(Guid id, [FromForm] HotelUpdateDTO request)
         {
             try
             {

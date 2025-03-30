@@ -57,10 +57,13 @@ namespace PRN231ProjectAPI.Controllers
         {
             if (!ModelState.IsValid)
                 throw new BadRequestException("Invalid request data");
-
-            var result = await _authService.Login(request);
+        
+            // Get client IP address
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
+    
+            var result = await _authService.Login(request, ipAddress);
             if (result == null)
-                throw new UnauthorizedException("Invalid credentials");
+                throw new UnauthorizedException("Invalid username or password");
 
             return Ok(new ApiResponse<LoginResponseDto>(200, "Login successful", result));
         }
@@ -123,6 +126,43 @@ namespace PRN231ProjectAPI.Controllers
                 throw new NotFoundException("User not found");
         
             return Ok(new ApiResponse<UserInfoDTO>(200, "User information retrieved successfully", userInfo));
+        }
+        [HttpPost("forgot-password")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+                throw new BadRequestException("Invalid request data");
+        
+            // Get client IP address
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
+    
+            try
+            {
+                await _authService.ForgotPassword(request, ipAddress);
+                return Ok(new ApiResponse<object>(200, "If your email exists in our system, you will receive password reset instructions"));
+            }
+            catch (BadRequestException ex)
+            {
+                return BadRequest(new ApiResponse<object>(400, ex.Message));
+            }
+        }
+
+        [HttpPost("reset-password")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+                throw new BadRequestException("Invalid request data");
+        
+            var result = await _authService.ResetPassword(request);
+    
+            if (!result)
+                return BadRequest(new ApiResponse<object>(400, "Invalid or expired reset code"));
+        
+            return Ok(new ApiResponse<object>(200, "Password has been reset successfully"));
         }
     }
 }

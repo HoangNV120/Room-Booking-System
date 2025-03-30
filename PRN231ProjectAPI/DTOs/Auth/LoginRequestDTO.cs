@@ -9,5 +9,8 @@ namespace PRN231ProjectAPI.DTOs.Auth
 
         [Required, MinLength(8)]
         public string Password { get; set; }
+        
+        [Required]
+        public string TurnstileToken { get; set; }
     }
 }

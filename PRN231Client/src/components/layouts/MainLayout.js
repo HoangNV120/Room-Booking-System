@@ -4,12 +4,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import {usePathname, useRouter} from 'next/navigation';
 import { toast } from "sonner";
 import { ApiAuth } from '@/services/ApiAuth';
 
 export default function MainLayout({ children }) {
     const pathname = usePathname();
+    const router = useRouter();
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -85,6 +86,7 @@ export default function MainLayout({ children }) {
                     localStorage.removeItem('accessToken');
                     localStorage.removeItem('refreshToken');
                     localStorage.removeItem('userId');
+                    localStorage.removeItem('role');
 
                     // Reset the userInfoCalledRef so we'll fetch again after login
                     userInfoCalledRef.current = false;
@@ -92,6 +94,8 @@ export default function MainLayout({ children }) {
                     toast.success("Successfully logged out");
                     setUser(null);
                     setDropdownOpen(false);
+                    router.push('/home');
+                    
                 })
                 .catch(err => {
                     console.error('Logout error:', err);
@@ -100,6 +104,7 @@ export default function MainLayout({ children }) {
                     localStorage.removeItem('accessToken');
                     localStorage.removeItem('refreshToken');
                     localStorage.removeItem('userId');
+                    localStorage.removeItem('role');
 
                     userInfoCalledRef.current = false;
 
@@ -112,6 +117,7 @@ export default function MainLayout({ children }) {
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('userId');
+            localStorage.removeItem('role');
 
             userInfoCalledRef.current = false;
 
@@ -159,21 +165,13 @@ export default function MainLayout({ children }) {
                                       }`}>
                                     Hotels
                                 </Link>
-                                <Link href="/rooms"
+                                <Link href="/bookings"
                                       className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                                          isActiveLink('/rooms')
+                                          isActiveLink('/bookings')
                                               ? "border-blue-500 text-gray-900 dark:text-white"
                                               : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-300 dark:hover:text-white"
                                       }`}>
-                                    Rooms
-                                </Link>
-                                <Link href="/payments"
-                                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                                          isActiveLink('/payments')
-                                              ? "border-blue-500 text-gray-900 dark:text-white"
-                                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-300 dark:hover:text-white"
-                                      }`}>
-                                    Payments
+                                    Bookings
                                 </Link>
                                 <Link href="/about"
                                       className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${

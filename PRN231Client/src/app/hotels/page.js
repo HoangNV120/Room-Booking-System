@@ -1,7 +1,7 @@
 ﻿// src/app/hotels/page.js
 'use client';
 
-import { useState, useEffect } from 'react';
+import {useState, useEffect, useRef} from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import MainLayout from '@/components/layouts/MainLayout';
@@ -13,6 +13,8 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Search, SortDesc, SortAsc } from 'lucide-react';
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Label} from "@/components/ui/label";
 
 export default function HotelsPage() {
     const [hotels, setHotels] = useState([]);
@@ -32,7 +34,92 @@ export default function HotelsPage() {
         hasNextPage: false
     });
     const defaultImageUrl = "https://vanangroup.com.vn/wp-content/uploads/2024/10/29df21cd740c64fda44d8e567685970b-e1729733600172.jpg";
+    // Add Hotel Dialog state
+    const [isAddHotelDialogOpen, setIsAddHotelDialogOpen] = useState(false);
+    const [newHotel, setNewHotel] = useState({
+        name: '',
+        address: '',
+        description: '',
+        image: null
+    });
+    const [hotelImagePreview, setHotelImagePreview] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const hotelFileInputRef = useRef(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+    
+    // Check if user is admin
+    useEffect(() => {
+        const userRole = localStorage.getItem('role');
+        setIsAdmin(userRole === 'Admin');
+    }, []);
+// Open Add Hotel Dialog
+    const openAddHotelDialog = () => {
+        setNewHotel({
+            name: '',
+            address: '',
+            description: '',
+            image: null
+        });
+        setHotelImagePreview(null);
+        setIsAddHotelDialogOpen(true);
+    };
 
+// Handle hotel form input changes
+    const handleHotelInputChange = (e) => {
+        const { name, value } = e.target;
+        setNewHotel(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+// Handle hotel image selection
+    const handleHotelImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setNewHotel(prev => ({
+                ...prev,
+                image: file
+            }));
+
+            // Create image preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setHotelImagePreview(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+// Handle hotel form submission
+    const handleAddHotelSubmit = async (e) => {
+        e.preventDefault();
+
+        // Validate form
+        if (!newHotel.name || !newHotel.address) {
+            toast.error('Please fill in all required fields');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            // Use the ApiHotel service to create a new hotel
+            await ApiHotel.createHotel(newHotel);
+
+            toast.success('Hotel created successfully');
+            setIsAddHotelDialogOpen(false);
+
+            // Refresh hotel list
+            fetchHotels();
+        } catch (error) {
+            console.error('Error creating hotel:', error);
+            toast.error(error.response?.data?.message || 'Failed to create hotel');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
     // Debounce search input
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -42,38 +129,38 @@ export default function HotelsPage() {
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
+    const fetchHotels = async () => {
+        setLoading(true);
+        try {
+            const response = await ApiHotel.getHotels({
+                nameSearch: debouncedSearchTerm,
+                sortDescending: sortDescending,
+                pageNumber: pageNumber,
+                pageSize: pageSize
+            });
+
+            if (response.data && response.data.data) {
+                setHotels(response.data.data.items);
+                setPagination({
+                    pageNumber: response.data.data.pageNumber,
+                    pageSize: response.data.data.pageSize,
+                    totalCount: response.data.data.totalCount,
+                    totalPages: response.data.data.totalPages,
+                    hasPreviousPage: response.data.data.hasPreviousPage,
+                    hasNextPage: response.data.data.hasNextPage
+                });
+                setTotalPages(response.data.data.totalPages);
+            }
+        } catch (error) {
+            console.error('Error fetching hotels:', error);
+            toast.error('Failed to load hotels');
+        } finally {
+            setLoading(false);
+        }
+    };
+    
     // Fetch hotels when params change
     useEffect(() => {
-        const fetchHotels = async () => {
-            setLoading(true);
-            try {
-                const response = await ApiHotel.getHotels({
-                    nameSearch: debouncedSearchTerm,
-                    sortDescending: sortDescending,
-                    pageNumber: pageNumber,
-                    pageSize: pageSize
-                });
-
-                if (response.data && response.data.data) {
-                    setHotels(response.data.data.items);
-                    setPagination({
-                        pageNumber: response.data.data.pageNumber,
-                        pageSize: response.data.data.pageSize,
-                        totalCount: response.data.data.totalCount,
-                        totalPages: response.data.data.totalPages,
-                        hasPreviousPage: response.data.data.hasPreviousPage,
-                        hasNextPage: response.data.data.hasNextPage
-                    });
-                    setTotalPages(response.data.data.totalPages);
-                }
-            } catch (error) {
-                console.error('Error fetching hotels:', error);
-                toast.error('Failed to load hotels');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchHotels();
     }, [debouncedSearchTerm, sortDescending, pageNumber, pageSize]);
 
@@ -145,10 +232,23 @@ export default function HotelsPage() {
         <MainLayout>
             <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 md:mb-0">
-                        Hotels
-                    </h1>
-                    <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4">
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                            Hotels
+                        </h1>
+                        {isAdmin && (
+                            <Button
+                                onClick={openAddHotelDialog}
+                                className="flex items-center gap-2 py-2 px-4 text-sm"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 5v14M5 12h14"></path>
+                                </svg>
+                                Add Hotel
+                            </Button>
+                        )}
+                    </div>
+                    <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 mt-4 md:mt-0">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -216,7 +316,7 @@ export default function HotelsPage() {
                                 <Card key={hotel.id} className="overflow-hidden transition-transform hover:scale-105">
                                     <div className="relative h-48">
                                         <Image
-                                            src={defaultImageUrl}
+                                            src={hotel.imageUrl || defaultImageUrl}
                                             alt={hotel.name}
                                             fill
                                             className="object-cover"
@@ -279,6 +379,131 @@ export default function HotelsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Add Hotel Dialog */}
+            <Dialog open={isAddHotelDialogOpen} onOpenChange={(open) => {
+                setIsAddHotelDialogOpen(open);
+                if (!open) {
+                    // Reset form when closing
+                    setHotelImagePreview(null);
+                    setNewHotel({
+                        name: '',
+                        address: '',
+                        description: '',
+                        image: null
+                    });
+                }
+            }}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Add New Hotel</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleAddHotelSubmit}>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="hotelName" className="text-right">Hotel Name *</Label>
+                                <Input
+                                    id="hotelName"
+                                    name="name"
+                                    value={newHotel.name}
+                                    onChange={handleHotelInputChange}
+                                    className="col-span-3"
+                                    placeholder="Enter hotel name"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="hotelAddress" className="text-right">Address *</Label>
+                                <Input
+                                    id="hotelAddress"
+                                    name="address"
+                                    value={newHotel.address}
+                                    onChange={handleHotelInputChange}
+                                    className="col-span-3"
+                                    placeholder="Enter hotel address"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="hotelDescription" className="text-right pt-2">Description</Label>
+                                <textarea
+                                    id="hotelDescription"
+                                    name="description"
+                                    value={newHotel.description}
+                                    onChange={handleHotelInputChange}
+                                    rows="4"
+                                    placeholder="Enter hotel description"
+                                    className="col-span-3 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="hotelImage" className="text-right">Image</Label>
+                                <div className="col-span-3">
+                                    <Input
+                                        id="hotelImage"
+                                        name="image"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleHotelImageChange}
+                                        ref={hotelFileInputRef}
+                                        className="cursor-pointer"
+                                    />
+
+                                    {/* Image Preview */}
+                                    {hotelImagePreview && (
+                                        <div className="mt-3 relative">
+                                            <Image
+                                                src={hotelImagePreview}
+                                                alt="Hotel Preview"
+                                                width={200}
+                                                height={120}
+                                                className="rounded-md object-cover"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                                                onClick={() => {
+                                                    setHotelImagePreview(null);
+                                                    setNewHotel({...newHotel, image: null});
+                                                    if (hotelFileInputRef.current) {
+                                                        hotelFileInputRef.current.value = "";
+                                                    }
+                                                }}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsAddHotelDialogOpen(false)}
+                                disabled={isSubmitting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? 'Creating...' : 'Create Hotel'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
         </MainLayout>
     );
 }
