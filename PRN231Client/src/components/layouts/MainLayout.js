@@ -16,6 +16,7 @@ export default function MainLayout({ children }) {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
     const userInfoCalledRef = useRef(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Handle clicks outside dropdown to close it
     useEffect(() => {
@@ -69,7 +70,10 @@ export default function MainLayout({ children }) {
         if (typeof window !== 'undefined') {
             checkAuth();
         }
-    }, []);
+
+        const userRole = localStorage.getItem('role');
+        setIsAdmin(userRole === 'Admin');
+    }, [user]);
 
     const handleLogout = () => {
         const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
@@ -93,6 +97,7 @@ export default function MainLayout({ children }) {
 
                     toast.success("Successfully logged out");
                     setUser(null);
+                    setIsAdmin(false);
                     setDropdownOpen(false);
                     router.push('/home');
                     
@@ -173,6 +178,16 @@ export default function MainLayout({ children }) {
                                       }`}>
                                     Bookings
                                 </Link>
+                                {isAdmin && (
+                                    <Link href="/manage-users"
+                                          className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                                              isActiveLink('/manage-users')
+                                                  ? "border-blue-500 text-gray-900 dark:text-white"
+                                                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-300 dark:hover:text-white"
+                                          }`}>
+                                        Manage Users
+                                    </Link>
+                                )}
                                 <Link href="/about"
                                       className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                                           isActiveLink('/about')
@@ -213,6 +228,7 @@ export default function MainLayout({ children }) {
                                             <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-600">
                                                 <p className="text-sm text-gray-700 dark:text-gray-200 font-medium">{user.fullName}</p>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Role: {user.role}</p>
                                             </div>
                                             <button
                                                 onClick={handleLogout}

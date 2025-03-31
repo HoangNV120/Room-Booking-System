@@ -164,5 +164,19 @@ namespace PRN231ProjectAPI.Controllers
         
             return Ok(new ApiResponse<object>(200, "Password has been reset successfully"));
         }
+        
+        [HttpGet("users")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(ApiResponse<PagedResponseDTO<UserInfoDTO>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> GetUsers([FromQuery] UserFilterRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+                throw new BadRequestException("Invalid request data");
+        
+            var users = await _authService.GetUsers(request);
+            return Ok(new ApiResponse<PagedResponseDTO<UserInfoDTO>>(200, "Users retrieved successfully", users));
+        }
     }
 }

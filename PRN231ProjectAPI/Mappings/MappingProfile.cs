@@ -16,6 +16,7 @@ namespace PRN231ProjectAPI.Mappings
             CreateMap<SignUpRequestDTO, User>()
                 .ForMember(dest => dest.PasswordHash, opt => opt.Ignore());
             CreateMap<User, SignUpResponseDTO>();
+            CreateMap<User, UserInfoDTO>();
             
             CreateMap<Room, RoomResponseDTO>()
                 .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Hotel.Name))
@@ -37,6 +38,7 @@ namespace PRN231ProjectAPI.Mappings
                 .ForMember(dest => dest.HotelName, opt => opt.MapFrom(src => src.Room.Hotel.Name))
                 .ForMember(dest => dest.HotelAddress, opt => opt.MapFrom(src => src.Room.Hotel.Address))
                 .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.FullName))
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
                 .ForMember(dest => dest.HotelId, opt => opt.MapFrom(src => src.Room.HotelId));
             
         }

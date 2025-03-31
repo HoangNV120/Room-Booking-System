@@ -150,7 +150,7 @@ export default function HotelDetailPage() {
             name: hotel.name || '',
             address: hotel.address || '',
             description: hotel.description || '',
-            image: null
+            image: hotel.imageUrl || null
         });
 
         // Set image preview if available
@@ -585,9 +585,22 @@ export default function HotelDetailPage() {
                 {hotel && (
                     <>
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">
-                                Available Rooms
-                            </h2>
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">
+                                    Available Rooms
+                                </h2>
+                                {isAdmin && (
+                                    <Button
+                                        onClick={openAddRoomDialog}
+                                        className="flex items-center gap-2 py-2 px-4 text-sm"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M12 5v14M5 12h14"></path>
+                                        </svg>
+                                        Add Room
+                                    </Button>
+                                )}
+                            </div>
                             <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-4">
                                 <Select
                                     value={filterType}
@@ -1127,7 +1140,7 @@ export default function HotelDetailPage() {
                                         {hotelImagePreview && (
                                             <div className="mt-3 relative">
                                                 <Image
-                                                    src={hotelImagePreview}
+                                                    src={editedHotel.image || hotelImagePreview}
                                                     alt="Hotel Preview"
                                                     width={200}
                                                     height={120}
@@ -1174,20 +1187,6 @@ export default function HotelDetailPage() {
                         </form>
                     </DialogContent>
                 </Dialog>
-
-                {/* Add Room Button - Only show for admins */}
-                {isAdmin && (
-                    <div className="fixed bottom-6 right-6">
-                        <Button
-                            onClick={openAddRoomDialog}
-                            className="rounded-full h-14 w-14 shadow-lg"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 5v14M5 12h14"></path>
-                            </svg>
-                        </Button>
-                    </div>
-                )}
             </div>
         </MainLayout>
     );

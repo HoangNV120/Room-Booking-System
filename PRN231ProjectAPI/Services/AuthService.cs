@@ -6,6 +6,7 @@ using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PRN231ProjectAPI.DTOs.Auth;
+using PRN231ProjectAPI.DTOs.Common;
 using PRN231ProjectAPI.Exceptions;
 using PRN231ProjectAPI.Models;
 using PRN231ProjectAPI.Utils;
@@ -358,5 +359,47 @@ public class AuthService
         await _redisService.RemovePasswordResetCodeAsync(request.Email);
 
         return true;
+    }
+    public async Task<PagedResponseDTO<UserInfoDTO>> GetUsers(UserFilterRequestDTO request)
+    {
+        // Start with base query
+        var query = _context.Users.AsQueryable();
+    
+        // Apply filters
+        if (!string.IsNullOrEmpty(request.FullName))
+            query = query.Where(u => u.FullName.Contains(request.FullName));
+        
+        if (!string.IsNullOrEmpty(request.Email))
+            query = query.Where(u => u.Email.Contains(request.Email));
+        
+        if (!string.IsNullOrEmpty(request.Role))
+            query = query.Where(u => u.Role == request.Role);
+    
+        // Apply sorting by creation date
+        query = request.SortOrder.ToLower() == "asc" 
+            ? query.OrderBy(u => u.CreatedAt)
+            : query.OrderByDescending(u => u.CreatedAt);
+    
+        // Get total count for pagination
+        var totalCount = await query.CountAsync();
+    
+        // Apply pagination
+        var users = await query
+            .Skip((request.PageNumber - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync();
+    
+        // Map to DTOs
+        var userDtos = _mapper.Map<List<UserInfoDTO>>(users);
+    
+        // Create paged response
+        return new PagedResponseDTO<UserInfoDTO>
+        {
+            Items = userDtos,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalCount = totalCount,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize)
+        };
     }
 }

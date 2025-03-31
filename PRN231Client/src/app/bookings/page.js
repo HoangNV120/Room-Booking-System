@@ -350,7 +350,13 @@ export default function BookingsPage() {
                             <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                             <tr>
                                 <th className="px-6 py-3">ID</th>
-                                <th className="px-6 py-3">Hotel / Room</th>
+                                {userRole === 'Admin' && (
+                                    <>
+                                        <th className="px-6 py-3">Username</th>
+                                        <th className="px-6 py-3">Email</th>
+                                    </>
+                                )}
+                                <th className="px-6 py-3 min-w-[220px]">Hotel / Room</th>
                                 <th className="px-6 py-3 cursor-pointer" onClick={toggleStartDateOrder}>
                                     <div className="flex items-center">
                                         Check-in
@@ -384,7 +390,13 @@ export default function BookingsPage() {
                                         <td className="px-6 py-3 font-medium text-gray-900 dark:text-white">
                                             {booking.id.substring(0, 8)}...
                                         </td>
-                                        <td className="px-6 py-3">
+                                        {userRole === 'Admin' && (
+                                            <>
+                                                <td className="px-6 py-3">{booking.userName || 'N/A'}</td>
+                                                <td className="px-6 py-3">{booking.email || 'N/A'}</td>
+                                            </>
+                                        )}
+                                        <td className="px-6 py-3 min-w-[220px]">
                                             <div>
                                                 <Link
                                                     href={`/hotels/${booking.hotelId}`}

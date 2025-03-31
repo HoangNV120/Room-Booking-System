@@ -72,4 +72,12 @@ export class ApiAuth {
             data: request,
         });
     }
+
+    static getUsers(params) {
+        return http({
+            method: "GET",
+            url: baseUrlAuth + "/users",
+            params: params,
+        });
+    }
 }

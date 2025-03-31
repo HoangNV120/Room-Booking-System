@@ -38,6 +38,7 @@ public class BookingService
         var query = _context.Bookings
             .Include(b => b.Room)
             .Include(b => b.Room.Hotel)
+            .Include(b => b.User)
             .AsQueryable();
 
         // Apply filters if provided
@@ -74,13 +75,14 @@ public class BookingService
         var booking = await _context.Bookings
             .Include(b => b.Room)
             .Include(b => b.Room.Hotel)
+            .Include(b => b.User)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking == null)
             throw new NotFoundException($"Booking with ID {id} not found");
         
         if (booking.UserId != Guid.Parse(userId))
-            throw new ForbiddenException("You are not authorized to view this booking");
+            throw new UnauthorizedException("You are not authorized to view this booking");
         
 
         return _mapper.Map<BookingResponseDTO>(booking);

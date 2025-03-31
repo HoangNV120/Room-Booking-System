@@ -150,7 +150,7 @@ export default function Register() {
                     <form onSubmit={handleSubmit}>
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="fullName">Full Name</Label>
+                                <Label htmlFor="fullName">Full Name*</Label>
                                 <Input
                                     id="fullName"
                                     type="text"
@@ -162,7 +162,7 @@ export default function Register() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email Address</Label>
+                                <Label htmlFor="email">Email Address*</Label>
                                 <Input
                                     id="email"
                                     type="email"
@@ -174,7 +174,7 @@ export default function Register() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="password">Password</Label>
+                                <Label htmlFor="password">Password*</Label>
                                 <Input
                                     id="password"
                                     type="password"
@@ -196,7 +196,7 @@ export default function Register() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                <Label htmlFor="confirmPassword">Confirm Password*</Label>
                                 <Input
                                     id="confirmPassword"
                                     type="password"

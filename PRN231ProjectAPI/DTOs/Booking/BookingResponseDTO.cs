@@ -3,6 +3,7 @@
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string UserName { get; set; } = null!;
+    public string Email { get; set; } = null!;
     public Guid RoomId { get; set; }
     public string RoomName { get; set; } = null!;
     public string RoomType { get; set; } = null!;
