@@ -11,13 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { ArrowUpDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon , ChevronLeft, ArrowUpDown} from "lucide-react";
 import { format, addDays, isBefore, differenceInDays } from "date-fns";
 import { ApiBooking } from "@/services/ApiBooking";
 
@@ -512,6 +511,17 @@ export default function HotelDetailPage() {
     return (
         <MainLayout>
             <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <div className="mb-6">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push('/hotels')}
+                        className="flex items-center gap-1"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                        Back to Hotels
+                    </Button>
+                </div>
                 {/* Hotel Details Section */}
                 {hotelLoading ? (
                     <div className="animate-pulse">
@@ -804,17 +814,22 @@ export default function HotelDetailPage() {
                                         required
                                     />
                                 </div>
+                                {/* Replace the existing room type input with this select */}
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="roomType" className="text-right">Room Type</Label>
-                                    <Input
-                                        id="roomType"
-                                        name="roomType"
+                                    <Select
                                         value={newRoom.roomType}
-                                        onChange={handleRoomInputChange}
-                                        className="col-span-3"
-                                        placeholder="e.g., Deluxe, Standard"
-                                        required
-                                    />
+                                        onValueChange={(value) => setNewRoom({...newRoom, roomType: value})}
+                                    >
+                                        <SelectTrigger id="roomType" className="col-span-3">
+                                            <SelectValue placeholder="Select room type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="VIP">VIP</SelectItem>
+                                            <SelectItem value="Double">Double</SelectItem>
+                                            <SelectItem value="Single">Single</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="price" className="text-right">Price (VND)</Label>

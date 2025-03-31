@@ -44,7 +44,12 @@ namespace PRN231ProjectAPI.Controllers
         {
             try
             {
-                var booking = await _bookingService.GetBookingById(id);
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                    throw new UnauthorizedException("Invalid authentication token");
+                
+                var booking = await _bookingService.GetBookingById(id,userIdClaim);
                 return Ok(new ApiResponse<BookingResponseDTO>(booking));
             }
             catch (NotFoundException)

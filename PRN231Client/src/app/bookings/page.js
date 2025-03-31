@@ -11,8 +11,9 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowUpDown } from 'lucide-react';
+import { Loader2, ArrowUpDown, Eye } from 'lucide-react';
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function BookingsPage() {
     const router = useRouter();
@@ -20,7 +21,10 @@ export default function BookingsPage() {
     const [loading, setLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userRole, setUserRole] = useState('');
-
+    const [selectedBooking, setSelectedBooking] = useState(null);
+    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+    const [isLoadingBooking, setIsLoadingBooking] = useState(false);
+    
     // Filter state
     const [filter, setFilter] = useState({
         pageNumber: 1,
@@ -268,6 +272,22 @@ export default function BookingsPage() {
         return null; // Don't render anything while checking auth
     }
 
+    const handleViewBooking = async (bookingId) => {
+        setIsLoadingBooking(true);
+        try {
+            const response = await ApiBooking.getBooking(bookingId);
+            if (response.data && response.data.data) {
+                setSelectedBooking(response.data.data);
+                setIsViewDialogOpen(true);
+            }
+        } catch (error) {
+            console.error('Error fetching booking details:', error);
+            toast.error('Failed to load booking details');
+        } finally {
+            setIsLoadingBooking(false);
+        }
+    };
+
     return (
         <MainLayout>
             <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -346,7 +366,7 @@ export default function BookingsPage() {
                                 <th className="px-6 py-3">Price</th>
                                 <th className="px-6 py-3">Status</th>
                                 <th className="px-6 py-3">Payment</th>
-                                {userRole !== 'Admin' && <th className="px-6 py-3">Actions</th>}
+                                <th className="px-6 py-3">Actions</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -385,14 +405,21 @@ export default function BookingsPage() {
                                         </td>
                                         <td className="px-6 py-3">{getStatusBadge(booking.status)}</td>
                                         <td className="px-6 py-3">{getPaymentBadge(booking.paymentStatus)}</td>
-                                        {userRole !== 'Admin' && (
-                                            <td className="px-6 py-3">
-                                                {booking.paymentStatus === 'Unpaid' && booking.status === 'Pending' && (
-                                                    <div className="flex gap-2">
+                                        <td className="px-6 py-3">
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    onClick={() => handleViewBooking(booking.id)}
+                                                    variant="ghost"
+                                                    size="sm"
+                                                >
+                                                    <Eye className="h-4 w-4" />
+                                                    View
+                                                </Button>
+                                                {userRole !== 'Admin' && booking.paymentStatus === 'Unpaid' && booking.status === 'Pending' && (
+                                                    <>
                                                         <Button
                                                             onClick={() => handlePayment(booking.id)}
                                                             variant="outline"
-                                                            disabled={booking.paymentStatus === 'Paid'}
                                                         >
                                                             Pay Now
                                                         </Button>
@@ -403,10 +430,10 @@ export default function BookingsPage() {
                                                         >
                                                             Cancel
                                                         </Button>
-                                                    </div>
+                                                    </>
                                                 )}
-                                            </td>
-                                        )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))
                             ) : (
@@ -443,6 +470,109 @@ export default function BookingsPage() {
                     </Pagination>
                 )}
             </div>
+
+            {/* Booking Details Dialog */}
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Booking Details</DialogTitle>
+                    </DialogHeader>
+
+                    {selectedBooking ? (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500">Booking ID</h3>
+                                    <p className="mt-1 text-sm text-gray-900">{selectedBooking.id}</p>
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500">Status</h3>
+                                    <p className="mt-1">{getStatusBadge(selectedBooking.status)}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-500">Hotel / Room</h3>
+                                <p className="mt-1 text-sm text-gray-900">
+                                    {selectedBooking.hotelName} - {selectedBooking.roomType}
+                                    {selectedBooking.roomName && ` (${selectedBooking.roomName})`}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500">Check-in</h3>
+                                    <p className="mt-1 text-sm text-gray-900">{formatDate(selectedBooking.checkInDate)}</p>
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500">Check-out</h3>
+                                    <p className="mt-1 text-sm text-gray-900">{formatDate(selectedBooking.checkOutDate)}</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500">Total Price</h3>
+                                    <p className="mt-1 text-sm text-gray-900 font-semibold">
+                                        {selectedBooking.totalPrice.toLocaleString('vi-VN')} ₫
+                                    </p>
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500">Payment Status</h3>
+                                    <p className="mt-1">{getPaymentBadge(selectedBooking.paymentStatus)}</p>
+                                </div>
+                            </div>
+
+                            {selectedBooking.paymentStatus === 'Paid' && (
+                                <div className="border-t pt-4 mt-4">
+                                    <h3 className="text-sm font-medium text-gray-500 mb-2">Payment Details</h3>
+
+                                    <div className="space-y-2 text-sm">
+                                        {selectedBooking.paymentMethod && (
+                                            <div className="grid grid-cols-2">
+                                                <span className="text-gray-500">Method:</span>
+                                                <span>{selectedBooking.paymentMethod}</span>
+                                            </div>
+                                        )}
+
+                                        {selectedBooking.paymentTransactionId && (
+                                            <div className="grid grid-cols-2">
+                                                <span className="text-gray-500">Transaction ID:</span>
+                                                <span>{selectedBooking.paymentTransactionId}</span>
+                                            </div>
+                                        )}
+
+                                        {selectedBooking.paymentBankCode && (
+                                            <div className="grid grid-cols-2">
+                                                <span className="text-gray-500">Bank Code:</span>
+                                                <span>{selectedBooking.paymentBankCode}</span>
+                                            </div>
+                                        )}
+
+                                        {selectedBooking.paymentBankTranNo && (
+                                            <div className="grid grid-cols-2">
+                                                <span className="text-gray-500">Bank Tran No:</span>
+                                                <span>{selectedBooking.paymentBankTranNo}</span>
+                                            </div>
+                                        )}
+
+                                        {selectedBooking.paymentCardType && (
+                                            <div className="grid grid-cols-2">
+                                                <span className="text-gray-500">Card Type:</span>
+                                                <span>{selectedBooking.paymentCardType}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="py-8 flex justify-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </MainLayout>
     );
 }

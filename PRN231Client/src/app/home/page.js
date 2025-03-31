@@ -17,7 +17,7 @@ export default async function HomePage() {
     const response = await ApiHotel.getHotels({
         pageNumber: 1,
         pageSize: 3,
-        sortDescending: false
+        sortDescending: true
     });
 
     const hotels = response.data?.data?.items || [];

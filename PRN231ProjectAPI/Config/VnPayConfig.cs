@@ -1,4 +1,4 @@
-﻿namespace PRN231ProjectAPI.DTOs.Payment;
+﻿namespace PRN231ProjectAPI.Config;
 
 public class VnPayConfig
 {

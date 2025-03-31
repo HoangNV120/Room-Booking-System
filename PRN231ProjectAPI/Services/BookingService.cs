@@ -4,6 +4,7 @@ using System.Text;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using PRN231ProjectAPI.Config;
 using PRN231ProjectAPI.DTOs.Booking;
 using PRN231ProjectAPI.DTOs.Common;
 using PRN231ProjectAPI.DTOs.Payment;
@@ -68,7 +69,7 @@ public class BookingService
         return _mapper.Map<List<BookingResponseDTO>>(bookings);
     }
 
-    public async Task<BookingResponseDTO> GetBookingById(Guid id)
+    public async Task<BookingResponseDTO> GetBookingById(Guid id, string userId)
     {
         var booking = await _context.Bookings
             .Include(b => b.Room)
@@ -77,6 +78,10 @@ public class BookingService
 
         if (booking == null)
             throw new NotFoundException($"Booking with ID {id} not found");
+        
+        if (booking.UserId != Guid.Parse(userId))
+            throw new ForbiddenException("You are not authorized to view this booking");
+        
 
         return _mapper.Map<BookingResponseDTO>(booking);
     }
@@ -281,7 +286,7 @@ public class BookingService
             else
             {
                 booking.PaymentStatus = "Unpaid";
-                booking.Status = "Canceled"; // Make sure to update both status fields
+                booking.Status = "Canceled"; 
             }
 
             // Save changes with detailed error handling
